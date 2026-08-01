@@ -1,0 +1,3837 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>監査サンプリング設計 | IC Studio</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%230F6B62'/%3E%3Cpath d='M6 7h12M6 12h12M6 17h7' stroke='white' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<style>
+  :root {
+    --primary: #6b46c1;
+    --primary-light: #ede9fe;
+    --primary-dark: #553c9a;
+    --secondary: #0f172a;
+    --accent-purple: #8b5cf6;
+    --accent-violet: #a78bfa;
+    --accent-indigo: #818cf8;
+    --accent-blue: #60a5fa;
+    --panel: #ffffff;
+    --ink: #1e293b;
+    --muted: #64748b;
+    --light-muted: #94a3b8;
+    --line: #e2e8f0;
+    --success: #10b981;
+    --success-light: #d1fae5;
+    --warning: #f59e0b;
+    --warning-light: #fef3c7;
+    --danger: #ef4444;
+    --danger-light: #fee2e2;
+    --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
+    background: linear-gradient(135deg, #f8fafc 0%, #ede9fe 25%, #f3f4f6 50%, #e0e7ff 100%);
+    color: var(--ink);
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+
+  .header {
+    text-align: center;
+    margin-bottom: 24px;
+    padding: 20px;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--accent-purple) 25%, var(--accent-violet) 50%, var(--accent-indigo) 100%);
+    border-radius: 16px;
+    box-shadow: var(--shadow-lg);
+    color: white;
+  }
+
+  .header h1 {
+    margin: 0 0 8px;
+    font-size: 28px;
+    font-weight: 700;
+  }
+
+  .version {
+    font-size: 14px;
+    opacity: 0.9;
+    margin-bottom: 12px;
+  }
+
+  .status {
+    font-size: 14px;
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 20px;
+    display: inline-block;
+    backdrop-filter: blur(10px);
+  }
+
+  .grid {
+    display: grid;
+    gap: 24px;
+    grid-template-columns: 1fr;
+  }
+
+  @media (min-width: 768px) {
+    .grid.two {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  .card {
+    background: var(--panel);
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  .card-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--line);
+    background: linear-gradient(135deg, var(--primary) 0%, var(--accent-purple) 100%);
+    color: white;
+  }
+
+  .card-header h2 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+  }
+
+  .card-body {
+    padding: 24px;
+  }
+
+  .audit-info {
+    background: linear-gradient(135deg, var(--primary-light) 0%, rgba(139, 92, 246, 0.1) 100%);
+    border: 2px solid var(--primary);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 24px;
+  }
+
+  .audit-info h3 {
+    margin: 0 0 12px;
+    color: var(--primary-dark);
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  .audit-info-grid {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+
+  .form-group {
+    margin-bottom: 20px;
+  }
+
+  .form-group:last-child {
+    margin-bottom: 0;
+  }
+
+  .form-label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 500;
+    color: var(--secondary);
+  }
+
+  .form-description {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .form-input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid var(--line);
+    border-radius: 8px;
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+    transition: all 0.2s ease;
+    background: #fafbfc;
+  }
+
+  .form-input:focus {
+    outline: none;
+    border-color: var(--primary);
+    background: white;
+    box-shadow: 0 0 0 3px rgba(107, 70, 193, 0.1);
+  }
+
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 16px;
+    margin-top: 20px;
+  }
+
+  .kpi-card {
+    padding: 16px;
+    background: linear-gradient(135deg, var(--primary-light) 0%, rgba(139, 92, 246, 0.1) 50%, rgba(129, 140, 248, 0.1) 100%);
+    border-radius: 12px;
+    text-align: center;
+    border: 2px solid transparent;
+    transition: all 0.2s ease;
+  }
+
+  .kpi-card:hover {
+    border-color: var(--primary);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow);
+  }
+
+  .kpi-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .kpi-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--secondary);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .kpi-formula {
+    font-size: 10px;
+    color: var(--light-muted);
+    margin-top: 4px;
+    font-style: italic;
+  }
+
+  .tabs {
+    display: flex;
+    margin-bottom: 24px;
+    background: var(--line);
+    border-radius: 12px;
+    padding: 4px;
+  }
+
+  .tab-button {
+    flex: 1;
+    padding: 12px 16px;
+    border: none;
+    background: transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    color: var(--muted);
+  }
+
+  .tab-button.active {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--accent-purple) 100%);
+    color: white;
+    box-shadow: var(--shadow);
+  }
+
+  .tab-content {
+    display: none;
+  }
+
+  .tab-content.active {
+    display: block;
+  }
+
+  .results-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 16px;
+    background: var(--panel);
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+  }
+
+  .results-table th,
+  .results-table td {
+    padding: 12px 16px;
+    text-align: left;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .results-table th {
+    background: #f8fafc;
+    font-weight: 600;
+    color: var(--secondary);
+    font-size: 13px;
+  }
+
+  .results-table td {
+    font-variant-numeric: tabular-nums;
+    font-size: 14px;
+  }
+
+  .results-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .highlight-row {
+    background: var(--success-light) !important;
+    font-weight: 600;
+  }
+
+  .sample-size-highlight {
+    background: linear-gradient(135deg, var(--success) 0%, #059669 100%) !important;
+    color: white !important;
+    font-size: 16px !important;
+    font-weight: 700 !important;
+  }
+
+  .alert {
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-top: 16px;
+    font-size: 13px;
+  }
+
+  .alert ul {
+    margin: 10px 0;
+    padding-left: 20px;
+  }
+
+  .alert.info {
+    background: var(--primary-light);
+    color: var(--primary-dark);
+    border: 1px solid var(--primary);
+  }
+
+  .alert.warning {
+    background: var(--warning-light);
+    color: #92400e;
+    border: 1px solid #fbbf24;
+  }
+
+  .alert.danger {
+    background: var(--danger-light);
+    color: #dc2626;
+    border: 1px solid #f87171;
+  }
+
+  .button-group {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 16px;
+  }
+
+  .btn {
+    padding: 10px 20px;
+    border: 2px solid var(--line);
+    border-radius: 8px;
+    background: white;
+    color: var(--secondary);
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none;
+  }
+
+  .btn:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    transform: translateY(-1px);
+  }
+
+  .btn.primary {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--accent-purple) 100%);
+    color: white;
+    border-color: var(--primary);
+  }
+
+  .btn.primary:hover {
+    background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
+    transform: translateY(-1px);
+  }
+
+  .footer {
+    text-align: center;
+    margin-top: 48px;
+    padding: 20px;
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  .error-toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: var(--danger);
+    color: white;
+    padding: 12px 20px;
+    border-radius: 8px;
+    box-shadow: var(--shadow-lg);
+    display: none;
+    max-width: 320px;
+    word-wrap: break-word;
+    z-index: 1000;
+  }
+
+  .sample-table {
+    width: 100%;
+    margin-top: 20px;
+    font-size: 13px;
+  }
+
+  .sample-table th {
+    background: #f1f5f9;
+    padding: 8px;
+    text-align: left;
+    font-weight: 600;
+  }
+
+  .sample-table td {
+    padding: 8px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .section-divider {
+    border: none;
+    border-top: 2px solid var(--line);
+    margin: 24px 0;
+  }
+
+  h3.section-title {
+    color: var(--primary-dark);
+    font-size: 16px;
+    margin: 20px 0 16px;
+    font-weight: 600;
+  }
+
+  @media (max-width: 767px) {
+    .container {
+      padding: 12px;
+    }
+    
+    .header {
+      padding: 16px;
+    }
+    
+    .header h1 {
+      font-size: 22px;
+    }
+    
+    .card-body {
+      padding: 16px;
+    }
+    
+    .audit-info-grid {
+      grid-template-columns: 1fr;
+    }
+    
+    .kpi-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .fade-in {
+    animation: fadeIn 0.3s ease-in;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .quick-ref-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+
+  .quick-ref-table th,
+  .quick-ref-table td {
+    padding: 6px 8px;
+    text-align: center;
+    border: 1px solid var(--line);
+  }
+
+  .quick-ref-table th {
+    font-weight: 600;
+    font-size: 11px;
+  }
+
+  .quick-ref-table td {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .quick-ref-table tbody tr:hover {
+    background: #f8fafc;
+  }
+
+
+  /* J-SOX Flow Builder shared visual language */
+  :root {
+    --primary: #0f6b62;
+    --primary-light: #edf2ef;
+    --primary-dark: #0b554e;
+    --secondary: #1a1a17;
+    --accent-purple: #0f6b62;
+    --accent-violet: #3e8e86;
+    --accent-indigo: #5e84c0;
+    --accent-blue: #5e84c0;
+    --panel: #ffffff;
+    --ink: #1a1a17;
+    --muted: #56635f;
+    --light-muted: #8a9794;
+    --line: #dcd8ce;
+    --line-soft: #e9e5dc;
+    --surface-soft: #f7faf9;
+    --success: #157f5b;
+    --success-light: #e6f2ec;
+    --warning: #9a6614;
+    --warning-light: #fbf1e0;
+    --danger: #b0413b;
+    --danger-light: #f7e9e7;
+    --shadow: none;
+    --shadow-lg: none;
+    --font-num: 'Inter', 'IBM Plex Sans JP', sans-serif;
+  }
+
+  html { scroll-behavior: smooth; scroll-padding-top: 70px; }
+
+  html, body {
+    background: #f4f6f6;
+    color: var(--ink);
+    font-family: 'IBM Plex Sans JP', system-ui, -apple-system, 'Hiragino Kaku Gothic ProN', 'Yu Gothic', Meiryo, sans-serif;
+    font-size: 13.5px;
+    line-height: 1.55;
+  }
+
+  body { min-height: 100vh; }
+
+  button, input, select { font-family: inherit; }
+
+  input, select, table, .kpi-value, #zoomLevel {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .appbar {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    min-height: 53px;
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #fff;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .appbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 214px;
+  }
+
+  .brand-logo {
+    width: 32px;
+    height: 32px;
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 2px;
+    color: #fff;
+    background: var(--primary);
+  }
+
+  .brand-logo i { font-size: 18px; }
+
+  .brand-copy {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    line-height: 1.18;
+  }
+
+  .brand-name {
+    color: var(--ink);
+    font-size: 13.5px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .brand-studio {
+    color: #94a4a0;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: .04em;
+  }
+
+  .appbar-spacer { flex: 1; }
+
+  .appbar-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 28px;
+    padding: 4px 10px;
+    color: var(--success);
+    background: var(--success-light);
+    border: 1px solid #c3e2d2;
+    border-radius: 2px;
+    font-size: 11.5px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .appbar-status.is-error {
+    color: var(--danger);
+    background: var(--danger-light);
+    border-color: #edcbc6;
+  }
+
+  .status-dot {
+    width: 7px;
+    height: 7px;
+    flex: none;
+    border-radius: 50%;
+    background: currentColor;
+  }
+
+  #timestamp { color: var(--light-muted); font-weight: 500; }
+
+  .zoom-controls {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 3px;
+    background: #eff2f1;
+    border: 1px solid #dce5e3;
+    border-radius: 2px;
+  }
+
+  .icon-button, .menu-button {
+    width: 28px;
+    height: 27px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #44514e;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 2px;
+    cursor: pointer;
+  }
+
+  .icon-button:hover, .menu-button:hover {
+    color: var(--primary-dark);
+    background: #fff;
+    border-color: #c9d6cf;
+  }
+
+  #zoomLevel {
+    min-width: 42px;
+    color: var(--muted);
+    font-family: var(--font-num);
+    font-size: 11px;
+    text-align: center;
+  }
+
+  .menu-button { display: none; }
+
+  .shell {
+    display: flex;
+    align-items: flex-start;
+    min-height: calc(100vh - 53px);
+  }
+
+  .side {
+    position: sticky;
+    top: 53px;
+    width: 224px;
+    height: calc(100vh - 53px);
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    color: #54615c;
+    background: #fff;
+    border-right: 1px solid var(--line);
+  }
+
+  .side-nav { flex: 1; padding: 8px 10px 16px; overflow-y: auto; }
+
+  .side-label {
+    padding: 14px 8px 5px;
+    color: #9faba7;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+  }
+
+  .side a {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    min-height: 36px;
+    margin: 1px 0;
+    padding: 8px 10px;
+    color: #54615c;
+    border-radius: 2px;
+    font-size: 13px;
+    text-decoration: none;
+  }
+
+  .side a i { width: 20px; flex: none; font-size: 17px; text-align: center; }
+
+  .side a:hover { color: var(--primary-dark); background: #eff4f2; }
+
+  .side a.active {
+    color: var(--primary-dark);
+    background: #e9f1ef;
+    font-weight: 600;
+  }
+
+  .side-footer { padding: 9px 10px; border-top: 1px solid var(--line-soft); }
+
+  .main { min-width: 0; flex: 1; }
+
+  .container {
+    width: 100%;
+    max-width: 1320px;
+    margin: 0;
+    padding: 22px 24px 40px;
+  }
+
+  .header {
+    display: flex;
+    align-items: flex-end;
+    gap: 24px;
+    margin: 0 0 14px;
+    padding: 0 0 16px;
+    color: var(--ink);
+    text-align: left;
+    background: transparent;
+    border-bottom: 1px solid var(--line);
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .header-main { min-width: 0; flex: 1; }
+
+  .eyebrow {
+    display: block;
+    margin-bottom: 7px;
+    color: var(--primary);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .08em;
+  }
+
+  .header h1 {
+    margin: 0;
+    color: var(--ink);
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1.35;
+  }
+
+  .header .version {
+    margin: 5px 0 0;
+    color: var(--muted);
+    font-size: 12.5px;
+    opacity: 1;
+  }
+
+  .scope-tags { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+
+  .scope-tag {
+    padding: 3px 9px;
+    color: var(--muted);
+    background: var(--surface-soft);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    font-family: var(--font-num);
+    font-size: 10.5px;
+    font-weight: 600;
+  }
+
+  #audit-target, #risk-model, #sampling-design, #quick-reference { scroll-margin-top: 0; }
+
+  .audit-info {
+    margin: 0 0 14px;
+    padding: 16px 18px;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--primary);
+    border-radius: 2px;
+  }
+
+  .audit-info h3 {
+    margin: 0 0 13px;
+    color: var(--ink);
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  .audit-info-grid { gap: 12px 16px; }
+
+  .card {
+    margin-bottom: 14px;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    box-shadow: none;
+  }
+
+  .card-header, .card-header[style] {
+    padding: 13px 18px !important;
+    color: var(--ink) !important;
+    background: #f2f6f5 !important;
+    border-bottom: 1px solid var(--line) !important;
+    border-radius: 0 !important;
+  }
+
+  .card-header h2, .card-header h3,
+  .card-header h2[style], .card-header h3[style] {
+    color: var(--ink) !important;
+    font-size: 15px !important;
+    font-weight: 700 !important;
+  }
+
+  .card-header[onclick]:hover { background: #eaf2f0 !important; }
+
+  .card-body { padding: 18px; overflow-x: auto; }
+
+  .card .card {
+    margin: 22px 0 0 !important;
+    border: 0 !important;
+    border-top: 1px solid var(--line) !important;
+    border-radius: 0 !important;
+    overflow: visible;
+  }
+
+  .card .card .card-header { padding: 14px 0 10px !important; background: transparent !important; }
+  .card .card .card-body { padding: 8px 0 0 !important; }
+
+  .form-group { margin-bottom: 16px; }
+
+  .form-label { margin-bottom: 5px; color: #33403c; font-size: 12.5px; font-weight: 600; }
+
+  .form-description { margin-top: 4px; color: var(--light-muted); font-size: 11.5px; }
+
+  .form-input {
+    min-height: 36px;
+    padding: 7px 10px;
+    color: var(--ink);
+    background: #fff;
+    border: 1px solid #dce5e3;
+    border-radius: 2px;
+    font-size: 13px;
+    transition: border-color 160ms ease, box-shadow 160ms ease;
+  }
+
+  .form-input:hover { border-color: #b4c3bf; }
+
+  .form-input:focus {
+    outline: 2px solid var(--primary);
+    outline-offset: 1px;
+    border-color: var(--primary);
+    box-shadow: none;
+  }
+
+  .grid { gap: 16px 20px; }
+
+  .kpi-grid { gap: 12px; margin-top: 18px; }
+
+  .kpi-card {
+    min-height: 112px;
+    padding: 14px 15px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-top: 3px solid var(--primary);
+    border-radius: 2px;
+    text-align: left;
+    transition: border-color 160ms ease, background 160ms ease;
+  }
+
+  .kpi-card:nth-child(2) { border-top-color: #5e84c0; }
+  .kpi-card:nth-child(3) { border-top-color: #9e833f; }
+  .kpi-card:hover { background: #fafcfb; border-color: var(--primary); transform: none; box-shadow: none; }
+  .kpi-label { color: var(--muted); font-size: 11.5px; letter-spacing: 0; text-transform: none; }
+  .kpi-value { margin: 5px 0 2px; color: var(--ink); font-family: var(--font-num); font-size: 25px; line-height: 1.2; }
+  .kpi-formula { color: var(--light-muted); font-size: 10.5px; font-style: normal; }
+
+  .tabs {
+    gap: 0;
+    margin-bottom: 18px;
+    padding: 3px;
+    background: #eff2f1;
+    border: 1px solid #dce5e3;
+    border-radius: 2px;
+  }
+
+  .tab-button {
+    min-height: 32px;
+    padding: 6px 12px;
+    color: var(--muted);
+    border: 0;
+    border-radius: 2px;
+    font-size: 12.5px;
+    font-weight: 600;
+  }
+
+  .tab-button:hover { color: var(--primary-dark); background: #f7faf9; }
+  .tab-button.active { color: #fff; background: var(--primary); box-shadow: none; }
+
+  .results-table, .sample-table, .quick-ref-table { border-collapse: collapse; border-radius: 0; }
+
+  .results-table { margin-top: 16px; border: 1px solid var(--line); }
+
+  .results-table th, .sample-table th, .quick-ref-table th {
+    color: #7a867f;
+    background: #f2f6f5;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .02em;
+  }
+
+  .results-table th, .results-table td { padding: 10px 12px; border-bottom: 1px dashed #d2dcd8; }
+  .sample-table th, .sample-table td { padding: 8px 10px; border-bottom: 1px dashed #d2dcd8; }
+  .quick-ref-table th, .quick-ref-table td { border: 1px solid var(--line); }
+  .results-table tbody tr:hover td, .sample-table tbody tr:hover td, .quick-ref-table tbody tr:hover td { background: #f8fbfa; }
+  .highlight-row { background: var(--success-light) !important; color: var(--success); }
+  .sample-size-highlight { background: var(--primary) !important; color: #fff !important; }
+
+  .quick-ref-table th[style*="#e0f2fe"] { color: #2d5a86; background: #e9f0f8 !important; }
+  .quick-ref-table th[style*="#fef3c7"] { color: #8a5a12; background: var(--warning-light) !important; }
+  .quick-ref-table th[style*="#fee2e2"] { color: var(--danger); background: var(--danger-light) !important; }
+  .quick-ref-table th[style*="#f1f5f9"] { background: #f2f6f5 !important; }
+
+  .alert {
+    padding: 10px 12px;
+    border-radius: 2px;
+    font-size: 12.5px;
+  }
+
+  .alert.info { color: #3d5f58; background: #f1f6f3; border: 1px solid #cfe3dc; }
+  .alert.warning { color: var(--warning); background: var(--warning-light); border: 1px solid #ebd9b4; }
+  .alert.danger { color: var(--danger); background: var(--danger-light); border: 1px solid #edcbc6; }
+
+  h3.section-title, h3.section-title[style] {
+    margin: 22px 0 13px;
+    padding-bottom: 7px;
+    color: var(--primary-dark) !important;
+    border-bottom: 1px solid var(--line-soft);
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  .section-divider { margin: 22px 0; border-top: 1px solid var(--line); }
+
+  .button-group { gap: 8px; }
+
+  .btn {
+    min-height: 34px;
+    padding: 7px 12px;
+    color: #33403c;
+    background: #fff;
+    border: 1px solid #dce5e3;
+    border-radius: 2px;
+    font-size: 12.5px;
+    font-weight: 600;
+    transform: none;
+  }
+
+  .btn > i { font-size: 15px; }
+  .btn:hover { color: var(--primary-dark); background: var(--surface-soft); border-color: #b4c3bf; transform: none; }
+  .btn.primary { color: #fff; background: var(--primary); border-color: var(--primary-dark); }
+  .btn.primary:hover { color: #fff; background: var(--primary-dark); border-color: var(--primary-dark); transform: none; }
+
+  .error-toast {
+    top: 65px;
+    padding: 10px 14px;
+    background: var(--danger);
+    border: 1px solid #91352f;
+    border-radius: 2px;
+    font-size: 12.5px;
+    box-shadow: 0 4px 14px rgba(20, 40, 35, .1);
+  }
+
+  .footer {
+    margin-top: 24px;
+    padding: 22px 0 4px;
+    color: var(--light-muted);
+    border-top: 1px solid var(--line);
+    font-size: 11.5px;
+    text-align: left;
+  }
+
+  .fade-in { animation: none; }
+  .nav-scrim { display: none; }
+
+  @media (max-width: 900px) {
+    .menu-button { display: inline-flex; }
+    .appbar-brand { min-width: 0; }
+    .side {
+      position: fixed;
+      top: 53px;
+      bottom: 0;
+      left: 0;
+      z-index: 60;
+      height: auto;
+      transform: translateX(-100%);
+      transition: transform 180ms ease;
+      box-shadow: 6px 0 18px rgba(20, 40, 35, .12);
+    }
+    body.nav-open .side { transform: translateX(0); }
+    .nav-scrim {
+      position: fixed;
+      inset: 53px 0 0;
+      z-index: 50;
+      width: 100%;
+      height: auto;
+      padding: 0;
+      background: rgba(20, 32, 30, .28);
+      border: 0;
+      border-radius: 0;
+    }
+    body.nav-open .nav-scrim { display: block; }
+  }
+
+  @media (max-width: 700px) {
+    .appbar { padding: 8px 10px; }
+    .brand-name { font-size: 12.5px; }
+    .appbar-status { display: none; }
+    .container { padding: 16px 12px 28px; }
+    .header { align-items: flex-start; flex-direction: column; gap: 10px; padding-bottom: 13px; }
+    .header h1 { font-size: 19px; }
+    .scope-tags { justify-content: flex-start; }
+    .audit-info, .card-body { padding: 14px; }
+    .card-header, .card-header[style] { padding: 12px 14px !important; }
+    .tabs { overflow-x: auto; }
+    .tab-button { min-width: 108px; white-space: nowrap; }
+    .kpi-grid { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+  }
+
+  @media print {
+    .appbar, .side, .nav-scrim { display: none !important; }
+    .shell { display: block; }
+    .container { max-width: none; padding: 0; }
+    .header { margin-bottom: 10px; }
+    .card, .audit-info { break-inside: avoid; }
+  }
+
+</style>
+</head>
+<body>
+<header class="appbar">
+  <button type="button" class="menu-button" onclick="toggleAppNav()" aria-label="ナビゲーションを開く" title="ナビゲーション">
+    <i class="ph ph-list" aria-hidden="true"></i>
+  </button>
+  <div class="appbar-brand">
+    <span class="brand-logo"><i class="ph ph-chart-scatter" aria-hidden="true"></i></span>
+    <span class="brand-copy">
+      <span class="brand-name">監査サンプリング設計</span>
+      <span class="brand-studio">IC STUDIO</span>
+    </span>
+  </div>
+  <div class="appbar-spacer"></div>
+  <div class="appbar-status" id="status"><span class="status-dot"></span>準備完了 <span id="timestamp"></span></div>
+  <div class="zoom-controls" aria-label="表示倍率">
+    <button type="button" class="icon-button" onclick="adjustZoom(-10)" aria-label="縮小" title="縮小"><i class="ph ph-minus" aria-hidden="true"></i></button>
+    <span id="zoomLevel">100%</span>
+    <button type="button" class="icon-button" onclick="adjustZoom(10)" aria-label="拡大" title="拡大"><i class="ph ph-plus" aria-hidden="true"></i></button>
+    <button type="button" class="icon-button" onclick="resetZoom()" aria-label="倍率をリセット" title="倍率をリセット"><i class="ph ph-arrow-counter-clockwise" aria-hidden="true"></i></button>
+  </div>
+</header>
+
+<div class="shell">
+  <aside class="side" id="appSide">
+    <nav class="side-nav" aria-label="ツール内ナビゲーション">
+      <div class="side-label">設計</div>
+      <a class="active" href="#overview"><i class="ph ph-gauge" aria-hidden="true"></i><span>概要</span></a>
+      <a href="#audit-target"><i class="ph ph-buildings" aria-hidden="true"></i><span>監査対象</span></a>
+      <a href="#risk-model"><i class="ph ph-shield-check" aria-hidden="true"></i><span>監査リスクモデル</span></a>
+      <a href="#sampling-design"><i class="ph ph-list-checks" aria-hidden="true"></i><span>サンプリング設計</span></a>
+      <div class="side-label">資料</div>
+      <a href="#quick-reference"><i class="ph ph-table" aria-hidden="true"></i><span>サンプル数早見表</span></a>
+    </nav>
+    <div class="side-footer">
+      <a href="https://norimaki-audit.github.io/jsox-flow-builder/jsox_flow_builder.html" target="_blank" rel="noopener"><i class="ph ph-flow-arrow" aria-hidden="true"></i><span>J-SOX Flow Builder</span></a>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="container">
+      <div class="header fade-in" id="overview">
+        <div class="header-main">
+          <span class="eyebrow">AUDIT SAMPLING / VERSION 2.9</span>
+          <h1>監査サンプリング設計</h1>
+          <div class="version">監査リスクの評価からサンプル数の算定、誤謬評価、調書出力までを一つの画面で管理</div>
+        </div>
+        <div class="scope-tags" aria-label="対応範囲">
+          <span class="scope-tag">CONTROL TEST</span>
+          <span class="scope-tag">BS / PPS</span>
+          <span class="scope-tag">PL</span>
+        </div>
+      </div>
+
+  <!-- 監査対象情報 -->
+  <div class="audit-info fade-in" id="audit-target">
+    <h3>監査対象情報</h3>
+    <div class="audit-info-grid">
+      <div class="form-group">
+        <label class="form-label" for="company">対象会社</label>
+        <input id="company" type="text" class="form-input" placeholder="○○株式会社">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="fiscalYear">会計年度</label>
+        <input id="fiscalYear" type="text" class="form-input" value="2025年3月期" placeholder="2025年3月期">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="account">勘定科目</label>
+        <input id="account" type="text" class="form-input" placeholder="売上高">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="assertion">アサーション</label>
+        <select id="assertion" class="form-input">
+          <option value="">選択してください</option>
+          <option value="実在性/発生">実在性/発生</option>
+          <option value="網羅性">網羅性</option>
+          <option value="権利と義務">権利と義務</option>
+          <option value="評価の妥当性">評価の妥当性</option>
+          <option value="期間配分">期間配分</option>
+          <option value="表示">表示</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- セットアップセクション -->
+  <div class="card fade-in" id="risk-model">
+    <div class="card-header">
+      <h2>監査リスクモデル セットアップ</h2>
+    </div>
+    <div class="card-body">
+      <div class="grid two">
+        <div class="form-group">
+          <label class="form-label" for="ar">目標監査リスク (AR)</label>
+          <input id="ar" type="number" class="form-input" step="0.001" min="0.0001" max="0.5" value="0.05">
+          <div class="form-description">全体として許容する監査リスク（0〜1）</div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="ir">固有リスク (IR)</label>
+          <input id="ir" type="number" class="form-input" step="0.01" min="0.05" max="1" value="0.50">
+          <div class="form-description">低：0.3 / 中：0.5 / 高：0.7</div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="cr">統制リスク (CR)</label>
+          <input id="cr" type="number" class="form-input" step="0.01" min="0.05" max="1" value="0.30">
+          <div class="form-description">低：0.3 / 中：0.5 / 高：0.7</div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="confidenceLevel">信頼度</label>
+          <select id="confidenceLevel" class="form-input">
+            <option value="0.90">90%（標準）</option>
+            <option value="0.95">95%（厳格）</option>
+            <option value="0.99">99%（最高水準）</option>
+          </select>
+          <div class="form-description">統計的信頼度の設定</div>
+        </div>
+      </div>
+
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-label">検出リスク DR</div>
+          <div class="kpi-value" id="drValue">—</div>
+          <div class="kpi-formula">AR ÷ (IR × CR)</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">受入リスク RIA</div>
+          <div class="kpi-value" id="riaValue">—</div>
+          <div class="kpi-formula">実証手続用（1〜20%でクリップ）</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">過信リスク ROO</div>
+          <div class="kpi-value" id="rooValue">—</div>
+          <div class="kpi-formula">統制テスト用（2〜10%でクリップ）</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- サンプリング設計タブ -->
+  <div class="card fade-in" id="sampling-design">
+    <div class="card-header">
+      <h2>サンプリング設計</h2>
+    </div>
+    <div class="card-body">
+      <!-- サンプリング実施前の留意点 -->
+      <div class="alert info" style="margin-bottom: 24px;">
+        <strong>サンプリング実施前の留意点：</strong>
+        <ul style="margin: 10px 0; padding-left: 20px;">
+          <li><strong>特定項目抽出の必要性：</strong>金額的重要性が高い項目、不正リスクが高い項目、異常な取引等は、サンプリングとは別に特定項目として全件抽出して検証する必要があります。</li>
+          <li><strong>階層化の必要性：</strong>母集団に異なる特性を持つ項目が混在する場合、同質的な部分母集団に階層化してそれぞれからサンプリングすることで、サンプル数を削減しつつ監査の有効性を高められます。</li>
+          <li><strong>母集団の網羅性確認：</strong>サンプリング対象となる母集団が、監査対象期間の全取引を網羅的に含んでいることを確認し、データの完全性と正確性を検証する必要があります。</li>
+        </ul>
+      </div>
+
+      <div class="tabs">
+        <button class="tab-button active" onclick="switchTab('attribute')">統制テスト</button>
+        <button class="tab-button" onclick="switchTab('substantive')">実証手続</button>
+        <button class="tab-button" onclick="switchTab('error-evaluation')">誤謬評価</button>
+      </div>
+
+      <!-- 統制テストタブ -->
+      <div id="attribute-tab" class="tab-content active">
+        <div class="alert info">
+          <strong>日本の実務基準：</strong> 母集団250件以上の場合、標準サンプル数は25件です。これは許容逸脱率9%、信頼度90%（サンプリングリスク10%）の前提で統計的に算出された件数です。
+        </div>
+
+        <div class="grid two">
+          <div class="form-group">
+            <label class="form-label" for="controlFrequency">統制頻度</label>
+            <select id="controlFrequency" class="form-input" onchange="setPopulationByFrequency(); calculateAttributeSampling()">
+              <option value="daily">日次・随時（250件以上/年）</option>
+              <option value="weekly">週次（52回/年）</option>
+              <option value="monthly">月次（12回/年）</option>
+              <option value="quarterly">四半期（4回/年）</option>
+              <option value="annually">年次（1回/年）</option>
+            </select>
+            <div class="form-description">統制が実施される頻度を選択</div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="populationSize">母集団件数</label>
+            <input id="populationSize" type="text" class="form-input" value="1,000" onblur="window.formatNumberInput(this); calculateAttributeSampling();" onchange="calculateAttributeSampling()">
+            <div class="form-description">評価期間中の統制実施総件数</div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="expectedDeviations">予想逸脱件数</label>
+            <select id="expectedDeviations" class="form-input" onchange="calculateAttributeSampling()">
+              <option value="0">0件（標準）</option>
+              <option value="1">1件</option>
+              <option value="2">2件</option>
+            </select>
+            <div class="form-description">過去実績から予想される逸脱件数</div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="tolerableRateNew">許容逸脱率</label>
+            <select id="tolerableRateNew" class="form-input" onchange="calculateAttributeSampling()">
+              <option value="0.09">9%（標準）</option>
+              <option value="0.07">7%（厳格）</option>
+              <option value="0.05">5%（最厳格）</option>
+            </select>
+            <div class="form-description">監査人が許容する最大逸脱率</div>
+          </div>
+        </div>
+
+        <table class="results-table">
+          <tr><th>項目</th><th>値</th></tr>
+          <tr><td>統制頻度</td><td id="attrFrequency">—</td></tr>
+          <tr><td>母集団件数</td><td id="attrPopulation">—</td></tr>
+          <tr><td>10%ルール適用時</td><td id="attr10Percent">—</td></tr>
+          <tr class="highlight-row"><td>必要サンプル数</td><td id="sampleSizeAdj">—</td></tr>
+          <tr><td>許容逸脱件数</td><td id="allowableDeviations">—</td></tr>
+          <tr><td>追加サンプル数（1件逸脱時）</td><td id="additionalSamples">—</td></tr>
+        </table>
+
+        <div id="attrAlert" class="alert warning" style="display: none;"></div>
+
+        <!-- 頻度別サンプル数参考表 -->
+        <table class="sample-table">
+          <thead>
+            <tr>
+              <th>統制頻度</th>
+              <th>母集団数（目安）</th>
+              <th>標準サンプル数</th>
+              <th>根拠</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>日次・随時</td>
+              <td>250件以上</td>
+              <td>25件</td>
+              <td>統計的サンプリング</td>
+            </tr>
+            <tr>
+              <td>週次</td>
+              <td>52件</td>
+              <td>5件</td>
+              <td>母集団の10%</td>
+            </tr>
+            <tr>
+              <td>月次</td>
+              <td>12件</td>
+              <td>2件</td>
+              <td>母集団の10%（最低2件）</td>
+            </tr>
+            <tr>
+              <td>四半期</td>
+              <td>4件</td>
+              <td>1件</td>
+              <td>母集団の25%</td>
+            </tr>
+            <tr>
+              <td>年次</td>
+              <td>1件</td>
+              <td>1件</td>
+              <td>全件</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="button-group">
+          <button class="btn" onclick="setStandardAttribute()">標準設定に戻す</button>
+          <button class="btn" onclick="copyAttributeResults()">結果をコピー</button>
+          <button class="btn primary" onclick="exportAttributeWorksheet()">監査調書出力</button>
+        </div>
+
+        <div class="alert info" style="margin-top: 20px;">
+          <strong>サンプル数の決定基準：</strong>
+          <ul>
+            <li>母集団250件以上：25件（統計的サンプリング）</li>
+            <li>母集団250件未満：母集団の10%（最低2件）</li>
+            <li>逸脱発見時：追加サンプルで対応可能（1件目なら17件追加）</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- 実証手続タブ -->
+      <div id="substantive-tab" class="tab-content">
+        <!-- 特定項目抽出セクション（折り畳み式） -->
+        <div class="card" style="margin-bottom: 20px;">
+          <div class="card-header" style="background: linear-gradient(135deg, var(--primary) 0%, var(--accent-purple) 100%); cursor: pointer;" onclick="toggleSpecificItems()">
+            <h3 style="font-size: 16px; margin: 0; color: white; display: flex; justify-content: space-between; align-items: center;">
+              特定項目抽出（サンプリング前の検討事項）
+              <span id="specificItemsToggle" style="font-size: 18px;">▼</span>
+            </h3>
+          </div>
+          <div id="specificItemsContent" class="card-body" style="display: none;">
+            <div class="alert info">
+              <strong>推奨：</strong>以下の特定項目は、サンプリングとは別に全件を抽出して検証することを推奨します。
+            </div>
+
+            <!-- 特定項目の自動識別 -->
+            <div class="grid two">
+              <div class="form-group">
+                <label class="form-label">金額基準による抽出</label>
+                <div style="display: flex; gap: 12px; align-items: center;">
+                  <span>重要性の</span>
+                  <input type="number" id="specificThresholdPercent" value="75" min="0" max="100" style="width: 80px;" class="form-input" onchange="updateSpecificItems()">
+                  <span>%超 = </span>
+                  <span id="specificThresholdAmount" style="font-weight: bold; color: var(--primary);">15,000,000円</span>
+                </div>
+                <div class="form-description">この金額を超える項目は全件抽出</div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">対象件数</label>
+                <div id="specificItemCount" style="font-size: 20px; font-weight: bold; color: var(--primary);">
+                  0 件
+                </div>
+                <div class="form-description">母集団の上位項目から推定</div>
+              </div>
+            </div>
+
+            <!-- 特定項目のカテゴリ -->
+            <h4 style="font-size: 14px; margin: 20px 0 12px; color: var(--primary-dark);">特定項目として抽出すべき項目</h4>
+            <div class="specific-items-checklist">
+              <table class="results-table">
+                <thead>
+                  <tr>
+                    <th style="width: 30px;">✓</th>
+                    <th>項目カテゴリ</th>
+                    <th>抽出基準</th>
+                    <th style="width: 100px;">件数</th>
+                    <th>備考</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><input type="checkbox" id="siHighValue" onchange="updateSpecificItems()"></td>
+                    <td>高額項目</td>
+                    <td id="siHighValueCriteria">15,000,000円超</td>
+                    <td><input type="number" id="siHighValueCount" value="0" style="width: 80px;" class="form-input" onchange="updateSpecificItems()"></td>
+                    <td>金額的重要性</td>
+                  </tr>
+                  <tr>
+                    <td><input type="checkbox" id="siUnusual" onchange="updateSpecificItems()"></td>
+                    <td>異常項目</td>
+                    <td>通常の取引パターンから逸脱</td>
+                    <td><input type="number" id="siUnusualCount" value="0" style="width: 80px;" class="form-input" onchange="updateSpecificItems()"></td>
+                    <td>不正リスク対応</td>
+                  </tr>
+                  <tr>
+                    <td><input type="checkbox" id="siRelatedParty" onchange="updateSpecificItems()"></td>
+                    <td>関連当事者取引</td>
+                    <td>グループ会社・役員との取引</td>
+                    <td><input type="number" id="siRelatedPartyCount" value="0" style="width: 80px;" class="form-input" onchange="updateSpecificItems()"></td>
+                    <td>開示の正確性</td>
+                  </tr>
+                  <tr>
+                    <td><input type="checkbox" id="siManualJournal" onchange="updateSpecificItems()"></td>
+                    <td>手動仕訳</td>
+                    <td>決算整理仕訳、組替仕訳</td>
+                    <td><input type="number" id="siManualJournalCount" value="0" style="width: 80px;" class="form-input" onchange="updateSpecificItems()"></td>
+                    <td>経営者の偏向</td>
+                  </tr>
+                  <tr>
+                    <td><input type="checkbox" id="siPeriodEnd" onchange="updateSpecificItems()"></td>
+                    <td>期末日付近取引</td>
+                    <td>期末前後5営業日</td>
+                    <td><input type="number" id="siPeriodEndCount" value="0" style="width: 80px;" class="form-input" onchange="updateSpecificItems()"></td>
+                    <td>カットオフ</td>
+                  </tr>
+                  <tr>
+                    <td><input type="checkbox" id="siNewCustomer" onchange="updateSpecificItems()"></td>
+                    <td>新規・重要取引先</td>
+                    <td>当期新規の重要取引</td>
+                    <td><input type="number" id="siNewCustomerCount" value="0" style="width: 80px;" class="form-input" onchange="updateSpecificItems()"></td>
+                    <td>取引実在性</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- 特定項目の集計 -->
+            <div style="margin-top: 20px; padding: 16px; background: var(--primary-light); border-radius: 8px;">
+              <div class="grid two">
+                <div>
+                  <div style="font-size: 13px; color: var(--muted);">特定項目 合計</div>
+                  <div id="totalSpecificItems" style="font-size: 24px; font-weight: bold; color: var(--primary);">0 件</div>
+                </div>
+                <div>
+                  <div style="font-size: 13px; color: var(--muted);">カバー率（金額ベース）</div>
+                  <div id="specificCoverage" style="font-size: 24px; font-weight: bold; color: var(--primary);">0.0%</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- サンプリングとの関係 -->
+            <div class="alert info" style="margin-top: 20px;">
+              <strong>サンプリングとの関係：</strong>
+              <ul style="margin: 8px 0; padding-left: 20px;">
+                <li>特定項目は<strong>全件検証</strong>（サンプリング不要）</li>
+                <li>残りの母集団から統計的/非統計的サンプリング</li>
+                <li>特定項目とサンプルで母集団全体をカバー</li>
+              </ul>
+            </div>
+
+            <!-- 特定項目抽出の根拠 -->
+            <div class="form-group">
+              <label class="form-label">特定項目抽出の根拠（監査調書用）</label>
+              <textarea id="specificItemRationale" class="form-input" rows="4" placeholder="例：
+- 重要性20百万円の75%（15百万円）を超える取引12件を金額基準で抽出
+- 期末日前後5営業日の売上取引を期間帰属の観点から抽出
+- 新規大口顧客との初回取引を実在性確認のため抽出
+- 上記により母集団の45%（金額ベース）をカバー"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- サンプリング対象の調整（特定項目を使用する場合のみ表示） -->
+        <div id="adjustmentNotice" class="alert info" style="margin-bottom: 20px; display: none;">
+          <strong>サンプリング対象の調整</strong>
+          <div style="margin-top: 8px;">
+            元の母集団：<span id="originalPopulation">500,000,000円（1,000件）</span><br>
+            特定項目控除後：<span id="adjustedPopulation" style="font-weight: bold; color: var(--primary);">275,000,000円（988件）</span><br>
+            <span style="font-size: 12px; color: var(--muted);">※ サンプル数は調整後の母集団から計算されます</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="samplingMethod">サンプリング方式</label>
+          <select id="samplingMethod" class="form-input" onchange="toggleSamplingMethod()">
+            <option value="statistical">統計的サンプリング（推奨）</option>
+            <option value="non-statistical">非統計的サンプリング（判断ベース）</option>
+          </select>
+          <div class="form-description">統計的手法を推奨しますが、状況に応じて選択可能</div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="accountType">勘定科目タイプ</label>
+          <select id="accountType" class="form-input" onchange="toggleAccountType()">
+            <option value="bs">BS項目（貸借対照表）</option>
+            <option value="pl">PL項目（損益計算書）</option>
+          </select>
+          <div class="form-description">検証対象の財務諸表区分を選択</div>
+        </div>
+
+        <!-- BS項目用セクション -->
+        <div id="bsSection">
+          <h3 class="section-title">BS項目 - PPS/MUSサンプリング</h3>
+          <div class="alert info">
+            <strong>適用場面：</strong>売掛金、棚卸資産、固定資産等の期末残高の実在性・評価の妥当性を検証。金額の大きい項目ほど選ばれやすく、過大計上の発見に効果的です。
+          </div>
+          
+          <div class="grid two">
+            <div class="form-group">
+              <label class="form-label" for="bsPopulationCount">母集団件数</label>
+              <input id="bsPopulationCount" type="text" class="form-input" value="1,000" onblur="window.formatNumberInput(this); calculateBSSampling();">
+              <div class="form-description">対象勘定の取引件数</div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="bookValue">母集団簿価 (BV)</label>
+              <input id="bookValue" type="text" class="form-input money-input" value="500,000,000" onblur="window.formatMoneyInput(this); calculateBSSampling();">
+              <div class="form-description">対象勘定の総簿価（円）</div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="materiality">勘定重要性 (M)</label>
+              <input id="materiality" type="text" class="form-input money-input" value="20,000,000" onblur="window.formatMoneyInput(this); calculateBSSampling();">
+              <div class="form-description">勘定レベルの重要性（円）</div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="tolerableMisstatement">許容誤謬 (TM)</label>
+              <input id="tolerableMisstatement" type="text" class="form-input money-input" value="10,000,000" onblur="window.formatMoneyInput(this); calculateBSSampling();">
+              <div class="form-description">重要性の一定割合（例：50%）</div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="expectedMisstatement">期待誤謬 (EM)</label>
+              <input id="expectedMisstatement" type="text" class="form-input money-input" value="1,000,000" onblur="window.formatMoneyInput(this); calculateBSSampling();">
+              <div class="form-description">過去実績から見積もる誤謬</div>
+            </div>
+          </div>
+
+          <!-- BS項目の算定ロジック説明（折り畳み式） -->
+          <div class="card" style="margin-top: 20px;">
+            <div class="card-header" style="background: linear-gradient(135deg, #60a5fa 0%, #818cf8 100%); cursor: pointer;" onclick="toggleBSLogicExplanation()">
+              <h3 style="font-size: 14px; margin: 0; display: flex; justify-content: space-between; align-items: center;">
+                BS項目（PPS/MUS）サンプル数の算定ロジック
+                <span id="bsLogicToggle" style="font-size: 18px;">▼</span>
+              </h3>
+            </div>
+            <div id="bsLogicExplanation" class="card-body" style="display: none; background: #fafbfc;">
+              <h4 style="font-size: 13px; color: var(--primary-dark); margin-bottom: 12px;">1. PPS/MUSの理論基盤（ポアソン分布）</h4>
+              <p style="font-size: 12px; margin-bottom: 16px;">
+                <strong>基本公式：</strong>n = (BV × CF) / (TM - EM)<br>
+                • BV：母集団簿価（Book Value）<br>
+                • CF：信頼係数（Confidence Factor）= -ln(受入リスク)<br>
+                • TM：許容誤謬（Tolerable Misstatement）<br>
+                • EM：期待誤謬（Expected Misstatement）<br><br>
+                
+                <strong>なぜポアソン分布を採用するのか：</strong><br>
+                • 金額単位サンプリング（各円が独立した単位）として扱う<br>
+                • 過大計上は「稀な事象」（通常1%未満）として モデル化<br>
+                • 大規模な金額母集団（n→∞）での誤謬発生を扱う<br>
+                • 汚染率（Taint = 誤謬額/簿価）が連続値を取る<br>
+                • 信頼係数2.31, 3.89, 5.33等はポアソン分布の累積分布関数から導出<br>
+                ※PL項目の二項分布と異なり、金額ベースの連続的な誤謬を扱うため
+              </p>
+
+              <h4 style="font-size: 13px; color: var(--primary-dark); margin-bottom: 12px;">2. 各パラメータの詳細説明</h4>
+              <p style="font-size: 12px; margin-bottom: 16px;">
+                <strong>母集団簿価（BV）：</strong><br>
+                • 検証対象となる勘定科目の期末残高総額<br>
+                • 例：売掛金総額、棚卸資産総額など<br><br>
+                
+                <strong>勘定重要性（M）：</strong><br>
+                • 財務諸表全体の重要性を個別勘定に配分した金額<br>
+                • 通常、財務諸表全体の重要性の一定割合を設定<br>
+                • リスク評価に応じて調整（高リスク勘定は低く設定）<br><br>
+                
+                <strong>許容誤謬（TM）：</strong><br>
+                • 勘定重要性の50-75%程度に設定するのが一般的<br>
+                • 監査人が許容できる最大の誤謬額<br>
+                • 他の監査手続きとの組み合わせを考慮して決定<br><br>
+                
+                <strong>期待誤謬（EM）：</strong><br>
+                • 過去の監査結果から予想される誤謬額<br>
+                • 初年度監査では保守的に見積もる（TM×10-20%）<br>
+                • 期待誤謬が高いほど必要サンプル数が増加
+              </p>
+
+              <h4 style="font-size: 13px; color: var(--primary-dark); margin-bottom: 12px;">3. 信頼係数（CF）の決定</h4>
+              <p style="font-size: 12px; margin-bottom: 16px;">
+                <strong>受入リスク（RIA）からの信頼係数算出：</strong><br>
+                CF = -ln(RIA)<br>
+                • RIA 5%（95%信頼度）→ CF = 3.00<br>
+                • RIA 10%（90%信頼度）→ CF = 2.31<br>
+                • RIA 20%（80%信頼度）→ CF = 1.61<br><br>
+                
+                <strong>期待誤謬による調整：</strong><br>
+                CF<sub>adj</sub> = CF × (1 + EM/TM)<br>
+                期待誤謬が高いほど信頼係数を増加させ、より多くのサンプルを抽出
+              </p>
+
+              <h4 style="font-size: 13px; color: var(--primary-dark); margin-bottom: 12px;">4. サンプリング間隔の計算</h4>
+              <p style="font-size: 12px; margin-bottom: 16px;">
+                <strong>サンプリング間隔（SI）：</strong><br>
+                SI = BV / n<br>
+                • 系統的抽出の際の選択間隔<br>
+                • ランダムスタートポイントから間隔ごとに抽出<br>
+                • 金額累計がSIの倍数を超えるたびにサンプル選択<br><br>
+                
+                <strong>確率比例抽出の実現：</strong><br>
+                • 高額項目ほど選ばれる確率が高い<br>
+                • SIを超える項目は確実に選択される（100%抽出）<br>
+                • 小額項目も金額に比例した確率で選択
+              </p>
+
+              <h4 style="font-size: 13px; color: var(--primary-dark); margin-bottom: 12px;">5. PPS/MUSの利点と制約</h4>
+              <p style="font-size: 12px; margin-bottom: 16px;">
+                <strong>利点：</strong><br>
+                • 過大計上の発見に効果的（監査の主要関心事項）<br>
+                • 金額的に重要な項目を優先的に選択<br>
+                • 統計的な結論が可能<br>
+                • ゼロまたは負の残高以外はすべて選択可能<br><br>
+                
+                <strong>制約：</strong><br>
+                • 過小計上の発見には不向き（別途手続きが必要）<br>
+                • ゼロまたは負の残高は選択されない<br>
+                • 母集団の階層化が困難<br>
+                • 誤謬額の点推定には不向き（上限推定のみ）
+              </p>
+
+              <h4 style="font-size: 13px; color: var(--primary-dark); margin-bottom: 12px;">6. 実務上の考慮事項</h4>
+              <p style="font-size: 12px; margin-bottom: 8px;">
+                <strong>高額項目の取扱い：</strong><br>
+                • サンプリング間隔を超える項目は全件抽出<br>
+                • 特定項目抽出と組み合わせて実施<br><br>
+                
+                <strong>母集団の準備：</strong><br>
+                • ゼロ・負の残高は除外または別途検証<br>
+                • 金額順にソートして累計額を計算<br>
+                • データの完全性と正確性を事前に検証
+              </p>
+
+              <div class="alert info" style="margin-top: 16px; font-size: 12px;">
+                <strong>注記：</strong>PPS/MUSサンプリングは、金額的重要性を重視したBS項目の検証に最適化されています。
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PL項目用セクション -->
+        <div id="plSection" style="display: none;">
+          <h3 class="section-title">PL項目 - 実証サンプリング</h3>
+          <div class="alert info">
+            <strong>適用場面：</strong>売上高、売上原価、販管費等の期間取引の発生・網羅性・正確性・期間帰属を検証。統制テストと組み合わせて使用することを推奨します。
+          </div>
+
+          <div class="grid two">
+            <div class="form-group">
+              <label class="form-label" for="plTransactionCount">母集団取引件数</label>
+              <input id="plTransactionCount" type="text" class="form-input" value="10,000" onblur="window.formatNumberInput(this); calculatePLSampling();" onchange="calculatePLSampling()">
+              <div class="form-description">期間中の総取引件数</div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="plTotalAmount">母集団金額</label>
+              <input id="plTotalAmount" type="text" class="form-input money-input" value="1,000,000,000" onblur="window.formatMoneyInput(this); calculatePLSampling();">
+              <div class="form-description">期間中の総取引金額（円）</div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="plMateriality">PL重要性基準</label>
+              <input id="plMateriality" type="text" class="form-input money-input" value="20,000,000" onblur="window.formatMoneyInput(this); calculatePLSampling();">
+              <div class="form-description">PL項目の重要性（円）</div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="plConfidenceLevel">信頼度</label>
+              <select id="plConfidenceLevel" class="form-input" onchange="calculatePLSampling()">
+                <option value="0.90">90%（標準）</option>
+                <option value="0.95" selected>95%（推奨）</option>
+                <option value="0.99">99%（厳格）</option>
+              </select>
+              <div class="form-description">統計的信頼度（Z値：1.65/1.96/2.58）</div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="plRiskLevel">リスク評価</label>
+              <select id="plRiskLevel" class="form-input" onchange="calculatePLSampling()">
+                <option value="low">低リスク（統制有効）</option>
+                <option value="medium">中リスク（統制一部有効）</option>
+                <option value="high">高リスク（統制無効）</option>
+              </select>
+              <div class="form-description">統制テストの結果を反映</div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="plAssertionType">重点アサーション</label>
+              <select id="plAssertionType" class="form-input" onchange="calculatePLSampling()">
+                <option value="occurrence">実在性/発生（売上の架空計上）</option>
+                <option value="completeness">網羅性（売上の計上漏れ）</option>
+                <option value="accuracy">正確性（金額の正確性）</option>
+                <option value="cutoff">期間帰属（カットオフ）</option>
+              </select>
+              <div class="form-description">PL項目で重点的に検証するアサーション</div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="plSamplingMethod">サンプリング手法</label>
+              <select id="plSamplingMethod" class="form-input" onchange="calculatePLSampling()">
+                <option value="systematic">系統的サンプリング</option>
+                <option value="random">ランダムサンプリング</option>
+                <option value="stratified">階層化サンプリング</option>
+              </select>
+              <div class="form-description">母集団の特性に応じて選択</div>
+            </div>
+          </div>
+
+          <!-- 重要性分析と調整オプション -->
+          <div class="card" style="margin-top: 20px; background: #f8fafc;">
+            <div class="card-body" style="padding: 16px;">
+              <h4 style="font-size: 14px; margin-bottom: 12px; color: var(--primary-dark);">金額的重要性の分析</h4>
+              <div class="grid two">
+                <div>
+                  <div style="font-size: 13px; color: var(--muted);">許容誤謬率</div>
+                  <div style="font-size: 16px; font-weight: 600; color: var(--primary);" id="tolerableErrorRate">—</div>
+                </div>
+                <div>
+                  <div style="font-size: 13px; color: var(--muted);">予想誤謬率</div>
+                  <div style="font-size: 16px; font-weight: 600;" id="expectedErrorRate">—</div>
+                </div>
+                <div>
+                  <div style="font-size: 13px; color: var(--muted);">平均取引金額</div>
+                  <div style="font-size: 16px; font-weight: 600;" id="avgTransactionAmount">—</div>
+                </div>
+                <div>
+                  <div style="font-size: 13px; color: var(--muted);">特定項目抽出閾値</div>
+                  <div style="font-size: 16px; font-weight: 600;" id="specificItemThreshold">—</div>
+                </div>
+                <div>
+                  <div style="font-size: 13px; color: var(--muted);">信頼度調整係数</div>
+                  <div style="font-size: 16px; font-weight: 600;" id="confidenceAdjustment">—</div>
+                </div>
+                <div>
+                  <div style="font-size: 13px; color: var(--muted);">重要性調整係数</div>
+                  <div style="font-size: 16px; font-weight: 600;" id="materialityAdjustment">—</div>
+                </div>
+              </div>
+              
+              <div style="margin-top: 16px;">
+                <label style="display: flex; align-items: center; cursor: pointer;">
+                  <input type="checkbox" id="ignoreMaterialityAdjustment" onchange="calculatePLSampling()" style="margin-right: 8px;">
+                  <span style="font-size: 13px;">重要性による調整を無効化</span>
+                </label>
+              </div>
+              
+              <div id="stratificationRecommendation" class="alert warning" style="display: none; margin-top: 12px; padding: 10px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="toggleStratificationDetails()">
+                  <strong>階層化推奨：取引金額の分布に偏りがある可能性があります</strong>
+                  <span id="stratToggle" style="font-size: 16px;">▼</span>
+                </div>
+                <div id="stratificationDetails" style="margin-top: 8px;">
+                  <p style="font-size: 12px; margin: 4px 0;">
+                    高額取引と通常取引を分けて階層化サンプリングを検討してください。
+                    平均取引金額が重要性基準に近いため、金額の分布に偏りがある可能性があります。
+                  </p>
+                  <label style="display: block; margin-top: 8px; cursor: pointer;">
+                    <input type="checkbox" id="ignoreStratification" onchange="calculatePLSampling()" style="margin-right: 6px;">
+                    <span style="font-size: 12px;">この推奨を考慮しない（折りたたまれます）</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- PL項目のサンプル数決定基準表 -->
+          <table class="sample-table">
+            <thead>
+              <tr>
+                <th>リスクレベル</th>
+                <th>基本サンプル率</th>
+                <th>最低サンプル数</th>
+                <th>網羅性検証時の調整</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>低リスク</td>
+                <td>0.5〜1.0%</td>
+                <td>30件</td>
+                <td>×1.5倍</td>
+              </tr>
+              <tr>
+                <td>中リスク</td>
+                <td>1.0〜2.0%</td>
+                <td>60件</td>
+                <td>×1.5倍</td>
+              </tr>
+              <tr>
+                <td>高リスク</td>
+                <td>2.0〜3.0%</td>
+                <td>90件</td>
+                <td>×1.5倍</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <!-- 算定ロジックの説明（折り畳み式） -->
+          <div class="card" style="margin-top: 20px;">
+            <div class="card-header" style="background: linear-gradient(135deg, #60a5fa 0%, #818cf8 100%); cursor: pointer;" onclick="togglePLLogicExplanation()">
+              <h3 style="font-size: 14px; margin: 0; display: flex; justify-content: space-between; align-items: center;">
+                PL項目サンプル数の算定ロジック
+                <span id="plLogicToggle" style="font-size: 18px;">▼</span>
+              </h3>
+            </div>
+            <div id="plLogicExplanation" class="card-body" style="display: none; background: #fafbfc;">
+              <h4 style="font-size: 13px; color: var(--primary-dark); margin-bottom: 12px;">1. 統計的理論基盤（二項分布の採用）</h4>
+              <p style="font-size: 12px; margin-bottom: 16px;">
+                <strong>基本公式：</strong>n = (Z² × p × q) / E²<br>
+                • Z：信頼係数（90%=1.65, 95%=1.96, 99%=2.58）<br>
+                • p：予想誤謬率（リスク評価から導出）<br>
+                • q：1-p（正常取引の割合）<br>
+                • E：許容誤謬率（重要性÷母集団金額）<br><br>
+                
+                <strong>なぜ二項分布を採用するのか：</strong><br>
+                • PL項目の取引は「誤謬あり/なし」の二値判定（ベルヌーイ試行）<br>
+                • 各取引の誤謬発生は独立事象と仮定<br>
+                • 母集団全体で誤謬率が一定と仮定<br>
+                • 有限母集団からの非復元抽出（厳密には超幾何分布だが、母集団が大きい場合は二項分布で近似）<br>
+                • 誤謬率が1-5%程度の範囲では二項分布が最も適切<br>
+                ※誤謬率が極めて低い（<1%）場合はポアソン分布での近似も可能ですが、実務的には二項分布で統一
+              </p>
+
+              <h4 style="font-size: 13px; color: var(--primary-dark); margin-bottom: 12px;">2. リスクベースのサンプル率設定</h4>
+              <p style="font-size: 12px; margin-bottom: 16px;">
+                <strong>予想誤謬率の設定根拠：</strong><br>
+                • 低リスク：0.5%（統制有効により誤謬発生確率が低い）<br>
+                • 中リスク：1.0%（統制に一部不備があり中程度の誤謬リスク）<br>
+                • 高リスク：2.0%（統制無効により誤謬発生確率が高い）<br><br>
+                <strong>基本サンプル率の導出：</strong><br>
+                • 低リスク：0.75%（95%信頼度、許容誤謬率2%想定）<br>
+                • 中リスク：1.5%（95%信頼度、許容誤謬率2%想定）<br>
+                • 高リスク：2.5%（95%信頼度、許容誤謬率2%想定）<br>
+                最低サンプル数（30/60/90件）は中心極限定理による統計的有意性を確保
+              </p>
+
+              <h4 style="font-size: 13px; color: var(--primary-dark); margin-bottom: 12px;">3. 信頼度による調整</h4>
+              <p style="font-size: 12px; margin-bottom: 16px;">
+                信頼度が高いほど、より多くのサンプルが必要：<br>
+                • 90%信頼度：基準値 ×0.85（Z=1.65）<br>
+                • 95%信頼度：基準値 ×1.00（Z=1.96）標準設定<br>
+                • 99%信頼度：基準値 ×1.30（Z=2.58）<br>
+                これは正規分布における信頼区間の幅に対応しています。
+              </p>
+
+              <h4 style="font-size: 13px; color: var(--primary-dark); margin-bottom: 12px;">4. 許容誤謬率による調整</h4>
+              <p style="font-size: 12px; margin-bottom: 16px;">
+                許容誤謬率 = PL重要性基準 ÷ 母集団金額<br>
+                • 許容誤謬率 &lt; 1%：サンプル数 ×1.5（精緻な検証必要）<br>
+                • 許容誤謬率 1-2%：サンプル数 ×1.2（追加的な注意）<br>
+                • 許容誤謬率 2-5%：標準的な検証<br>
+                • 許容誤謬率 &gt; 5%：サンプル数 ×0.8（効率化可能）<br>
+                許容誤謬率が低いほど、より精密な推定が必要となります。
+              </p>
+
+              <h4 style="font-size: 13px; color: var(--primary-dark); margin-bottom: 12px;">5. 監査要点による調整</h4>
+              <p style="font-size: 12px; margin-bottom: 16px;">
+                • <strong>網羅性検証：×1.5倍</strong><br>
+                　過小計上は過大計上より発見が困難（取引の不存在を証明する必要）<br>
+                　カットオフテストや連番管理確認などの追加手続きと併用<br>
+                • <strong>その他の要点：</strong>調整なし（標準的な検証で対応可能）
+              </p>
+
+              <h4 style="font-size: 13px; color: var(--primary-dark); margin-bottom: 12px;">6. サンプリング手法による効率化</h4>
+              <p style="font-size: 12px; margin-bottom: 16px;">
+                • <strong>階層化サンプリング：×0.85</strong><br>
+                　母集団を同質的な層に分割することで変動係数が減少<br>
+                　各層から最適配分でサンプリングすることで全体効率が向上<br>
+                • <strong>系統的/ランダム：</strong>調整なし（基本的な手法）
+              </p>
+
+              <h4 style="font-size: 13px; color: var(--primary-dark); margin-bottom: 12px;">7. 実務的な上限設定</h4>
+              <p style="font-size: 12px; margin-bottom: 8px;">
+                効率性と費用対効果を考慮した実務的制約：<br>
+                • 母集団の10%上限（これ以上は全数検査に近い）<br>
+                • 絶対上限500件（監査資源の制約）<br>
+                • 特定項目抽出（重要性の50%超）との併用により、高額取引は別途全件検証
+              </p>
+
+              <div class="alert info" style="margin-top: 16px; font-size: 12px;">
+                <strong>注記：</strong>このロジックは統計的サンプリング理論に基づいています。実際の適用にあたっては、監査人の職業的専門家としての判断が必要です。
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 非統計的サンプリングセクション -->
+        <div id="nonStatisticalSection" style="display: none;">
+          <h3 class="section-title">非統計的サンプリング - 職業的専門家の判断</h3>
+          <div class="alert warning">
+            <strong>注意：</strong>非統計的サンプリングではサンプリングリスクを定量化できません。十分な職業的懐疑心を持って判断してください。
+          </div>
+
+          <div class="card" style="margin: 20px 0; background: #f8fafc;">
+            <div class="card-body" style="padding: 20px;">
+              <h4 style="font-size: 15px; margin-bottom: 16px; color: var(--primary-dark);">リスク要因の評価</h4>
+              <div class="grid two">
+                <div class="form-group">
+                  <label class="form-label" for="nsPopulationScale">母集団規模</label>
+                  <select id="nsPopulationScale" class="form-input" onchange="calculateNonStatistical()">
+                    <option value="small">小規模（500件未満）</option>
+                    <option value="medium">中規模（500-5000件）</option>
+                    <option value="large">大規模（5000件超）</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="nsRiskAssessment">総合リスク評価</label>
+                  <select id="nsRiskAssessment" class="form-input" onchange="calculateNonStatistical()">
+                    <option value="low">低リスク</option>
+                    <option value="medium">中リスク</option>
+                    <option value="high">高リスク</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="nsMaterialityLevel">重要性の程度</label>
+                  <select id="nsMaterialityLevel" class="form-input" onchange="calculateNonStatistical()">
+                    <option value="high">高い（重要性比率 < 2%）</option>
+                    <option value="medium">中程度（2-5%）</option>
+                    <option value="low">低い（5%超）</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="nsPriorFindings">過去の監査結果</label>
+                  <select id="nsPriorFindings" class="form-input" onchange="calculateNonStatistical()">
+                    <option value="clean">問題なし</option>
+                    <option value="minor">軽微な発見事項</option>
+                    <option value="significant">重要な発見事項</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- 調整要因チェックリスト -->
+              <div style="margin-top: 20px;">
+                <h4 style="font-size: 14px; margin-bottom: 12px;">サンプル数の調整要因</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                  <label style="display: flex; align-items: center;">
+                    <input type="checkbox" id="nsNewSystem" onchange="calculateNonStatistical()" style="margin-right: 8px;">
+                    新規システム・プロセス（+50%）
+                  </label>
+                  <label style="display: flex; align-items: center;">
+                    <input type="checkbox" id="nsKeyAccount" onchange="calculateNonStatistical()" style="margin-right: 8px;">
+                    重要勘定科目（+30%）
+                  </label>
+                  <label style="display: flex; align-items: center;">
+                    <input type="checkbox" id="nsAutomated" onchange="calculateNonStatistical()" style="margin-right: 8px;">
+                    自動化プロセス（-30%）
+                  </label>
+                  <label style="display: flex; align-items: center;">
+                    <input type="checkbox" id="nsAnalytical" onchange="calculateNonStatistical()" style="margin-right: 8px;">
+                    分析的手続実施済（-20%）
+                  </label>
+                </div>
+              </div>
+
+              <!-- サンプル数決定 -->
+              <div style="margin-top: 20px; padding: 16px; background: white; border-radius: 8px;">
+                <div class="grid two">
+                  <div>
+                    <div style="font-size: 13px; color: var(--muted);">推奨サンプル数</div>
+                    <div style="font-size: 20px; font-weight: 700; color: var(--primary);" id="nsSuggestedSample">30件</div>
+                  </div>
+                  <div>
+                    <div style="font-size: 13px; color: var(--muted);">統計的手法での参考値</div>
+                    <div style="font-size: 16px; color: var(--muted);" id="nsStatisticalComparison">—</div>
+                  </div>
+                </div>
+                
+                <div class="form-group" style="margin-top: 16px;">
+                  <label class="form-label" for="nsFinalSampleSize">最終サンプル数（手動調整可）</label>
+                  <input id="nsFinalSampleSize" type="number" class="form-input" value="30" min="15" max="500">
+                  <div class="form-description">最低15件、最大500件の範囲で調整可能</div>
+                </div>
+              </div>
+
+              <!-- 判断根拠の記録 -->
+              <div class="form-group" style="margin-top: 20px;">
+                <label class="form-label" for="nsJudgmentRationale">サンプル数の判断根拠（必須）</label>
+                <textarea id="nsJudgmentRationale" class="form-input" rows="5" placeholder="例：
+- 母集団は約2,000件の中規模
+- 前年度監査で重要な発見事項なし
+- 統制環境は良好で、重要な変更なし
+- 分析的手続で異常な変動なし
+- 以上を総合的に勘案し、30件で十分な監査証拠が得られると判断"></textarea>
+              </div>
+            </div>
+          </div>
+
+          <!-- アプローチ比較 -->
+          <div class="card" style="margin: 20px 0; border: 2px solid var(--line);">
+            <div class="card-header" style="background: #f8fafc; padding: 16px;">
+              <h4 style="font-size: 14px; margin: 0; color: var(--primary-dark);">アプローチ比較</h4>
+            </div>
+            <div class="card-body" style="padding: 16px;">
+              <table class="results-table">
+                <tr>
+                  <th>比較項目</th>
+                  <th>統計的サンプリング</th>
+                  <th>非統計的サンプリング</th>
+                </tr>
+                <tr>
+                  <td>サンプル数</td>
+                  <td id="compStatSample">—</td>
+                  <td id="compNonStatSample">30件</td>
+                </tr>
+                <tr>
+                  <td>サンプリングリスク</td>
+                  <td>定量化可能（5-10%）</td>
+                  <td style="color: var(--warning);">定量化不可</td>
+                </tr>
+                <tr>
+                  <td>客観性</td>
+                  <td>高い</td>
+                  <td>監査人の判断に依存</td>
+                </tr>
+                <tr>
+                  <td>柔軟性</td>
+                  <td>限定的</td>
+                  <td>高い</td>
+                </tr>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- 共通結果表示 -->
+        <hr class="section-divider">
+        <h3 class="section-title">計算結果</h3>
+        <table class="results-table">
+          <tr><th>項目</th><th>値</th></tr>
+          <tr><td>勘定科目タイプ</td><td id="accountTypeDisplay">—</td></tr>
+          <tr><td>サンプリング手法</td><td id="samplingMethodDisplay">—</td></tr>
+          <tr><td>リスク評価</td><td id="riskAssessment">—</td></tr>
+          <tr class="sample-size-highlight"><td>必要サンプル数</td><td id="finalSampleSize">—</td></tr>
+          <tr><td>サンプリング間隔</td><td id="samplingInterval">—</td></tr>
+          <tr><td>開始地点（ランダム）</td><td id="startingPoint">—</td></tr>
+          <tr><td>カバレッジ率</td><td id="coverageRate">—</td></tr>
+          <tr><td>推奨追加手続</td><td id="recommendedProcedures">—</td></tr>
+        </table>
+
+        <div id="substantiveAlert" class="alert warning" style="display: none; margin-top: 16px;"></div>
+
+        <div class="button-group">
+          <button class="btn primary" onclick="recalculateSubstantive()">再計算</button>
+          <button class="btn" onclick="copySubstantiveResults()">結果をコピー</button>
+          <button class="btn primary" onclick="exportSubstantiveWorksheet()">監査調書出力</button>
+        </div>
+      </div>
+
+      <!-- 誤謬評価タブ -->
+      <div id="error-evaluation-tab" class="tab-content">
+        <div class="alert info">
+          <strong>誤謬評価の重要性：</strong> サンプリングで発見された誤謬は適切に評価し、母集団全体への影響を推定する必要があります。評価結果により追加手続きや監査意見への影響を判断します。
+        </div>
+
+        <!-- 統制テストの誤謬評価 -->
+        <div class="card" style="margin-bottom: 24px;">
+          <div class="card-header" style="background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%); cursor: pointer;" onclick="toggleAttrErrorSection()">
+            <h2 style="font-size: 16px; margin: 0; display: flex; justify-content: space-between; align-items: center;">
+              統制テストの誤謬評価
+              <span id="attrErrorToggle" style="font-size: 18px;">▼</span>
+            </h2>
+          </div>
+          <div id="attrErrorContent" class="card-body" style="display: none;">
+            <div class="grid two">
+              <div class="form-group">
+                <label class="form-label" for="attrSampleSize">サンプル数</label>
+                <input id="attrSampleSize" type="number" class="form-input" value="25" min="1">
+                <div class="form-description">実施したサンプル数</div>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="attrDeviations">発見逸脱数</label>
+                <input id="attrDeviations" type="number" class="form-input" value="0" min="0">
+                <div class="form-description">発見された逸脱の件数</div>
+              </div>
+            </div>
+
+            <div class="results-table" style="margin-top: 20px;">
+              <table style="width: 100%;">
+                <tr><th>評価項目</th><th>結果</th></tr>
+                <tr><td>逸脱率（点推定）</td><td id="attrDeviationRate">—</td></tr>
+                <tr><td>上限逸脱率（90%信頼度）</td><td id="attrUpperLimit">—</td></tr>
+                <tr><td>評価結果</td><td id="attrEvalResult">—</td></tr>
+                <tr><td>必要な対応</td><td id="attrRequiredAction">—</td></tr>
+              </table>
+            </div>
+
+            <div id="attrEvalAlert" class="alert warning" style="display: none; margin-top: 16px;"></div>
+
+            <div class="alert info" style="margin-top: 16px;">
+              <strong>統制テストの評価方法：</strong>
+              <ul style="margin: 8px 0; padding-left: 20px;">
+                <li><strong>点推定逸脱率</strong>：発見逸脱数÷サンプル数</li>
+                <li><strong>上限逸脱率</strong>：90%信頼度でのWilson Score Intervalによる推定上限値</li>
+                <li><strong>25件で1件逸脱時</strong>：追加17件で逸脱0なら、合計42件中1件（2.4%）で有効判定可能</li>
+                <li>許容逸脱率9%を基準に統制の有効性を判定</li>
+              </ul>
+            </div>
+
+            <button class="btn primary" onclick="evaluateAttributeErrors()" style="margin-top: 16px;">統制誤謬を評価</button>
+          </div>
+        </div>
+
+        <!-- 実証手続の誤謬評価 -->
+        <div class="card" style="margin-bottom: 24px;">
+          <div class="card-header" style="background: linear-gradient(135deg, #818cf8 0%, #a78bfa 100%); cursor: pointer;" onclick="togglePPSErrorSection()">
+            <h2 style="font-size: 16px; margin: 0; display: flex; justify-content: space-between; align-items: center;">
+              実証手続の誤謬評価
+              <span id="ppsErrorToggle" style="font-size: 18px;">▼</span>
+            </h2>
+          </div>
+          <div id="ppsErrorContent" class="card-body" style="display: none;">
+            <div class="grid two">
+              <div class="form-group">
+                <label class="form-label" for="ppsSampleCount">サンプル数</label>
+                <input id="ppsSampleCount" type="number" class="form-input" value="60" min="1">
+                <div class="form-description">実施したサンプル数</div>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="ppsErrorCount">誤謬件数</label>
+                <input id="ppsErrorCount" type="number" class="form-input" value="0" min="0">
+                <div class="form-description">発見された誤謬の件数</div>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">個別誤謬詳細</label>
+              <div id="ppsErrorDetails">
+                <div class="error-detail-row" style="display: flex; gap: 12px; margin-bottom: 8px;">
+                  <input type="text" class="form-input money-input" placeholder="簿価" style="flex: 1;" id="ppsBookValue1" onblur="window.formatMoneyInput(this); window.calculateOverstatement(1);">
+                  <input type="text" class="form-input money-input" placeholder="監査後価値" style="flex: 1;" id="ppsAuditValue1" onblur="window.formatMoneyInput(this); window.calculateOverstatement(1);">
+                  <input type="text" class="form-input" placeholder="過大計上額" style="flex: 1;" id="ppsOverstatement1" readonly>
+                </div>
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <button class="btn" onclick="addPPSErrorRow()">誤謬行を追加</button>
+                <button class="btn" onclick="removePPSErrorRow()">最終行を削除</button>
+              </div>
+            </div>
+
+            <!-- 定性的評価セクション（新規追加） -->
+            <hr class="section-divider">
+            <h3 style="font-size: 15px; color: var(--primary-dark); margin: 20px 0 16px;">誤謬の定性的評価</h3>
+            
+            <div class="grid two">
+              <div class="form-group">
+                <label class="form-label" for="errorNature">誤謬の性質</label>
+                <select id="errorNature" class="form-input">
+                  <option value="">選択してください</option>
+                  <option value="unintentional">非意図的（過失）</option>
+                  <option value="intentional">意図的（不正の疑い）</option>
+                  <option value="systematic">システム的</option>
+                  <option value="isolated">単発的</option>
+                </select>
+                <div class="form-description">誤謬の発生パターン</div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="errorFrequency">発生頻度</label>
+                <select id="errorFrequency" class="form-input">
+                  <option value="">選択してください</option>
+                  <option value="one-time">一時的</option>
+                  <option value="recurring">反復的</option>
+                  <option value="increasing">増加傾向</option>
+                  <option value="decreasing">減少傾向</option>
+                </select>
+                <div class="form-description">誤謬の発生傾向</div>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="errorCause">発生原因の分析</label>
+              <textarea id="errorCause" class="form-input" rows="3" placeholder="例：
+- 担当者の理解不足による計算誤り
+- システムの設定ミスによる自動計算誤謬
+- 内部統制の不備による承認漏れ"></textarea>
+              <div class="form-description">根本原因を記載</div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="otherImpact">他領域への影響評価</label>
+              <textarea id="otherImpact" class="form-input" rows="3" placeholder="例：
+- 同様の処理を行う他勘定への影響：売掛金、前払費用
+- 関連する開示項目への影響：セグメント情報
+- 内部統制評価への影響：決算プロセスの統制"></textarea>
+              <div class="form-description">波及効果の検討</div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="managementResponse">経営者の対応</label>
+              <textarea id="managementResponse" class="form-input" rows="2" placeholder="例：修正仕訳の計上、プロセスの改善、担当者への再教育"></textarea>
+              <div class="form-description">経営者の改善対応</div>
+            </div>
+
+            <div class="alert info" style="margin-top: 16px;">
+              <strong>推定方法の説明：</strong>
+              <ul style="margin: 8px 0; padding-left: 20px;">
+                <li><strong>基本精度</strong>：誤謬が0件でも存在する誤謬リスク（信頼係数×サンプリング間隔）</li>
+                <li><strong>増分許容誤謬</strong>：発見誤謬数に応じた追加リスク（各誤謬の信頼係数増分×サンプリング間隔）</li>
+                <li><strong>推定誤謬上限（UML）</strong>：基本精度＋増分許容誤謬＝母集団全体の推定最大誤謬額</li>
+                <li>信頼係数は90%信頼度での標準値を使用（0件:2.31, 1件:3.89, 2件:5.33, 3件:6.69, 4件:8.00）</li>
+              </ul>
+            </div>
+
+            <div class="results-table" style="margin-top: 20px;">
+              <table style="width: 100%;">
+                <tr><th>評価項目</th><th>金額</th></tr>
+                <tr><td>基本精度</td><td id="ppsBasicPrecision">—</td></tr>
+                <tr><td>増分許容誤謬</td><td id="ppsIncrementalAllowance">—</td></tr>
+                <tr><td>推定誤謬上限（UML）</td><td id="ppsUpperLimit">—</td></tr>
+                <tr><td>許容誤謬</td><td id="ppsTolerable">—</td></tr>
+                <tr class="highlight-row"><td>評価結果</td><td id="ppsEvalResult">—</td></tr>
+              </table>
+            </div>
+
+            <div id="ppsEvalAlert" class="alert warning" style="display: none; margin-top: 16px;"></div>
+
+            <button class="btn primary" onclick="evaluatePPSErrors()" style="margin-top: 16px;">実証誤謬を評価</button>
+          </div>
+        </div>
+
+        <!-- 監査意見への影響 -->
+        <div class="card">
+          <div class="card-header" style="background: linear-gradient(135deg, #ef4444 0%, #f87171 100%); cursor: pointer;" onclick="toggleAuditOpinionSection()">
+            <h2 style="font-size: 16px; margin: 0; display: flex; justify-content: space-between; align-items: center;">
+              監査意見への影響
+              <span id="auditOpinionToggle" style="font-size: 18px;">▼</span>
+            </h2>
+          </div>
+          <div id="auditOpinionContent" class="card-body" style="display: none;">
+            <h3 style="color: var(--primary-dark); font-size: 15px; margin-bottom: 16px;">統制テストの影響</h3>
+            <table class="sample-table">
+              <thead>
+                <tr>
+                  <th>逸脱率の状況</th>
+                  <th>統制の評価</th>
+                  <th>監査への影響</th>
+                  <th>対応方法</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>0件（逸脱なし）</td>
+                  <td style="color: var(--success);">有効</td>
+                  <td>統制リスクを計画通り評価</td>
+                  <td>追加手続き不要</td>
+                </tr>
+                <tr>
+                  <td>1件（追加サンプル後0件）</td>
+                  <td style="color: var(--warning);">条件付き有効</td>
+                  <td>統制リスクを若干高く評価</td>
+                  <td>実証手続きを若干増加</td>
+                </tr>
+                <tr>
+                  <td>2件以上</td>
+                  <td style="color: var(--danger);">無効</td>
+                  <td>統制リスクを高く評価</td>
+                  <td>実証手続きを大幅増加</td>
+                </tr>
+                <tr>
+                  <td>上限逸脱率 > 許容逸脱率</td>
+                  <td style="color: var(--danger);">重要な不備</td>
+                  <td>内部統制報告書に影響</td>
+                  <td>経営者に改善を要請</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <h3 style="color: var(--primary-dark); font-size: 15px; margin: 24px 0 16px;">実証手続の影響</h3>
+            <table class="sample-table">
+              <thead>
+                <tr>
+                  <th>推定誤謬の状況</th>
+                  <th>評価</th>
+                  <th>監査意見への影響</th>
+                  <th>対応方法</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>UML < 許容誤謬×50%</td>
+                  <td style="color: var(--success);">受入可能</td>
+                  <td>無限定適正意見</td>
+                  <td>追加手続き不要</td>
+                </tr>
+                <tr>
+                  <td>UML < 許容誤謬</td>
+                  <td style="color: var(--warning);">条件付き受入</td>
+                  <td>無限定適正意見（留意）</td>
+                  <td>翌期の監査計画で考慮</td>
+                </tr>
+                <tr>
+                  <td>UML > 許容誤謬</td>
+                  <td style="color: var(--danger);">受入不可</td>
+                  <td>追加手続き必要</td>
+                  <td>サンプル追加または修正要請</td>
+                </tr>
+                <tr>
+                  <td>UML > 重要性基準値</td>
+                  <td style="color: var(--danger);">重要な虚偽表示</td>
+                  <td>限定付適正または不適正意見</td>
+                  <td>経営者に修正を要請</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div class="alert info" style="margin-top: 24px;">
+              <strong>注意事項：</strong>
+              <ul>
+                <li>誤謬の性質（意図的/非意図的）により対応が異なります</li>
+                <li>誤謬の発生原因を分析し、他の領域への影響を検討します</li>
+                <li>定量的評価に加え、定性的評価も重要です</li>
+                <li>最終的な判断は職業的専門家としての判断が必要です</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- サンプル数早見表 -->
+  <div class="card fade-in" id="quick-reference" style="margin-bottom: 24px;">
+    <div class="card-header" style="background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%); cursor: pointer;" onclick="toggleQuickReference()">
+      <h2 style="font-size: 18px; margin: 0; display: flex; justify-content: space-between; align-items: center;">
+        サンプル数早見表（クイックリファレンス）
+        <span id="quickRefToggle" style="font-size: 20px;">▼</span>
+      </h2>
+    </div>
+    <div id="quickReference" class="card-body" style="display: none;">
+      <div class="alert info" style="margin-bottom: 20px;">
+        <strong>使用方法：</strong>
+        IRとCRの組み合わせ、母集団と許容誤謬（TM）の比率から必要サンプル数を確認できます。
+        信頼度95%、期待誤謬10%の標準的な条件での参考値です。実際の監査では状況に応じて調整してください。
+      </div>
+
+      <!-- BS項目早見表 -->
+      <div class="card" style="margin-bottom: 20px; border: 2px solid #e2e8f0;">
+        <div class="card-header" style="background: #f8fafc; padding: 16px;">
+          <h3 style="font-size: 16px; margin: 0; color: var(--primary-dark);">
+            BS項目（PPS/MUS）サンプル数早見表
+          </h3>
+        </div>
+        <div class="card-body" style="padding: 16px;">
+          <p style="font-size: 12px; color: var(--muted); margin-bottom: 12px;">
+            前提条件：監査リスク5%、信頼度95%、期待誤謬率10%
+          </p>
+          <div style="overflow-x: auto;">
+            <table class="quick-ref-table">
+              <thead>
+                <tr>
+                  <th rowspan="2" style="background: #f1f5f9;">母集団÷TM</th>
+                  <th colspan="9" style="background: #f1f5f9; text-align: center;">IR×CR の組み合わせ（検出リスク）</th>
+                </tr>
+                <tr>
+                  <th style="background: #e0f2fe;">低×低<br><span style="font-size: 10px;">DR=56%</span></th>
+                  <th style="background: #e0f2fe;">低×中<br><span style="font-size: 10px;">DR=33%</span></th>
+                  <th style="background: #e0f2fe;">低×高<br><span style="font-size: 10px;">DR=24%</span></th>
+                  <th style="background: #fef3c7;">中×低<br><span style="font-size: 10px;">DR=33%</span></th>
+                  <th style="background: #fef3c7;">中×中<br><span style="font-size: 10px;">DR=20%</span></th>
+                  <th style="background: #fef3c7;">中×高<br><span style="font-size: 10px;">DR=14%</span></th>
+                  <th style="background: #fee2e2;">高×低<br><span style="font-size: 10px;">DR=24%</span></th>
+                  <th style="background: #fee2e2;">高×中<br><span style="font-size: 10px;">DR=14%</span></th>
+                  <th style="background: #fee2e2;">高×高<br><span style="font-size: 10px;">DR=10%</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td>2倍</td><td>2</td><td>3</td><td>4</td><td>3</td><td>4</td><td>5</td><td>4</td><td>5</td><td>6</td></tr>
+                <tr><td>3倍</td><td>3</td><td>4</td><td>5</td><td>4</td><td>6</td><td>7</td><td>5</td><td>7</td><td>8</td></tr>
+                <tr><td>5倍</td><td>4</td><td>7</td><td>9</td><td>7</td><td>10</td><td>12</td><td>9</td><td>12</td><td>14</td></tr>
+                <tr><td>10倍</td><td>9</td><td>14</td><td>17</td><td>14</td><td>19</td><td>24</td><td>17</td><td>24</td><td>28</td></tr>
+                <tr><td>15倍</td><td>13</td><td>20</td><td>26</td><td>20</td><td>29</td><td>36</td><td>26</td><td>36</td><td>42</td></tr>
+                <tr><td>20倍</td><td>17</td><td>27</td><td>34</td><td>27</td><td>38</td><td>48</td><td>34</td><td>48</td><td>55</td></tr>
+                <tr><td>25倍</td><td>22</td><td>34</td><td>43</td><td>34</td><td>48</td><td>60</td><td>43</td><td>60</td><td>69</td></tr>
+                <tr><td>30倍</td><td>26</td><td>41</td><td>51</td><td>41</td><td>57</td><td>72</td><td>51</td><td>72</td><td>83</td></tr>
+                <tr><td>50倍</td><td>43</td><td>68</td><td>86</td><td>68</td><td>96</td><td>120</td><td>86</td><td>120</td><td>138</td></tr>
+                <tr><td>80倍</td><td>69</td><td>108</td><td>137</td><td>108</td><td>153</td><td>192</td><td>137</td><td>192</td><td>221</td></tr>
+                <tr><td>100倍</td><td>87</td><td>135</td><td>171</td><td>135</td><td>191</td><td>240</td><td>171</td><td>240</td><td>276</td></tr>
+                <tr><td>150倍</td><td>130</td><td>203</td><td>257</td><td>203</td><td>287</td><td>360</td><td>257</td><td>360</td><td>414</td></tr>
+                <tr><td>200倍</td><td>173</td><td>270</td><td>343</td><td>270</td><td>383</td><td>480</td><td>343</td><td>480</td><td>500</td></tr>
+                <tr><td>300倍</td><td>260</td><td>405</td><td>500</td><td>405</td><td>500</td><td>500</td><td>500</td><td>500</td><td>500</td></tr>
+                <tr><td>500倍</td><td>433</td><td>500</td><td>500</td><td>500</td><td>500</td><td>500</td><td>500</td><td>500</td><td>500</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p style="font-size: 11px; color: var(--muted); margin-top: 12px;">
+            ※ サンプル数上限は実務的な観点から500件としています<br>
+            ※ DR（検出リスク）= 監査リスク5% ÷ (IR × CR)で計算、上限20%でクリップ
+          </p>
+        </div>
+      </div>
+
+      <!-- PL項目早見表 -->
+      <div class="card" style="border: 2px solid #e2e8f0;">
+        <div class="card-header" style="background: #f8fafc; padding: 16px;">
+          <h3 style="font-size: 16px; margin: 0; color: var(--primary-dark);">
+            PL項目サンプル数早見表
+          </h3>
+        </div>
+        <div class="card-body" style="padding: 16px;">
+          <p style="font-size: 12px; color: var(--muted); margin-bottom: 12px;">
+            前提条件：信頼度95%、予想誤謬率1%、網羅性検証なし
+          </p>
+          <div style="overflow-x: auto;">
+            <table class="quick-ref-table">
+              <thead>
+                <tr>
+                  <th rowspan="2" style="background: #f1f5f9;">母集団÷TM</th>
+                  <th colspan="9" style="background: #f1f5f9; text-align: center;">IR×CR の組み合わせ（リスク評価）</th>
+                </tr>
+                <tr>
+                  <th style="background: #e0f2fe;">低×低<br><span style="font-size: 10px;">低リスク</span></th>
+                  <th style="background: #e0f2fe;">低×中<br><span style="font-size: 10px;">低リスク</span></th>
+                  <th style="background: #e0f2fe;">低×高<br><span style="font-size: 10px;">中リスク</span></th>
+                  <th style="background: #fef3c7;">中×低<br><span style="font-size: 10px;">低リスク</span></th>
+                  <th style="background: #fef3c7;">中×中<br><span style="font-size: 10px;">中リスク</span></th>
+                  <th style="background: #fef3c7;">中×高<br><span style="font-size: 10px;">中リスク</span></th>
+                  <th style="background: #fee2e2;">高×低<br><span style="font-size: 10px;">中リスク</span></th>
+                  <th style="background: #fee2e2;">高×中<br><span style="font-size: 10px;">中リスク</span></th>
+                  <th style="background: #fee2e2;">高×高<br><span style="font-size: 10px;">高リスク</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td>2倍</td><td>30</td><td>30</td><td>60</td><td>30</td><td>60</td><td>60</td><td>60</td><td>60</td><td>90</td></tr>
+                <tr><td>3倍</td><td>30</td><td>30</td><td>60</td><td>30</td><td>60</td><td>60</td><td>60</td><td>60</td><td>90</td></tr>
+                <tr><td>5倍</td><td>30</td><td>30</td><td>60</td><td>30</td><td>60</td><td>60</td><td>60</td><td>60</td><td>90</td></tr>
+                <tr><td>10倍</td><td>30</td><td>30</td><td>60</td><td>30</td><td>60</td><td>60</td><td>60</td><td>60</td><td>90</td></tr>
+                <tr><td>15倍</td><td>30</td><td>30</td><td>60</td><td>30</td><td>60</td><td>60</td><td>60</td><td>60</td><td>90</td></tr>
+                <tr><td>20倍</td><td>30</td><td>30</td><td>60</td><td>30</td><td>60</td><td>60</td><td>60</td><td>60</td><td>90</td></tr>
+                <tr><td>25倍</td><td>30</td><td>30</td><td>60</td><td>30</td><td>60</td><td>60</td><td>60</td><td>60</td><td>90</td></tr>
+                <tr><td>30倍</td><td>30</td><td>30</td><td>60</td><td>30</td><td>60</td><td>60</td><td>60</td><td>60</td><td>90</td></tr>
+                <tr><td>50倍</td><td>38</td><td>38</td><td>75</td><td>38</td><td>75</td><td>75</td><td>75</td><td>75</td><td>125</td></tr>
+                <tr><td>80倍</td><td>60</td><td>60</td><td>120</td><td>60</td><td>120</td><td>120</td><td>120</td><td>120</td><td>200</td></tr>
+                <tr><td>100倍</td><td>75</td><td>75</td><td>150</td><td>75</td><td>150</td><td>150</td><td>150</td><td>150</td><td>250</td></tr>
+                <tr><td>150倍</td><td>113</td><td>113</td><td>225</td><td>113</td><td>225</td><td>225</td><td>225</td><td>225</td><td>375</td></tr>
+                <tr><td>200倍</td><td>150</td><td>150</td><td>300</td><td>150</td><td>300</td><td>300</td><td>300</td><td>300</td><td>500</td></tr>
+                <tr><td>300倍</td><td>225</td><td>225</td><td>450</td><td>225</td><td>450</td><td>450</td><td>450</td><td>450</td><td>500</td></tr>
+                <tr><td>500倍</td><td>375</td><td>375</td><td>500</td><td>375</td><td>500</td><td>500</td><td>500</td><td>500</td><td>500</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p style="font-size: 11px; color: var(--muted); margin-top: 12px;">
+            ※ 最低サンプル数：低リスク30件、中リスク60件、高リスク90件<br>
+            ※ 網羅性検証の場合は上記の1.5倍、階層化の場合は0.85倍で調整<br>
+            ※ 許容誤謬率が1%未満の場合は上記の1.5倍で調整
+          </p>
+        </div>
+      </div>
+
+      <div class="alert warning" style="margin-top: 20px;">
+        <strong>注意事項：</strong>
+        <ul style="margin: 8px 0; padding-left: 20px;">
+          <li>この早見表は標準的な条件での参考値です</li>
+          <li>実際の監査では、個別の状況に応じた調整が必要です</li>
+          <li>特定項目抽出や他の監査手続との組み合わせも考慮してください</li>
+          <li>職業的専門家としての判断が最終的に重要です</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div>監査サンプリング設計 v2.9 | BS / PL / 統制テスト対応</div>
+    <div style="margin-top: 6px;">© 2025 norimaki audit / IC Studio</div>
+  </div>
+    </div>
+  </main>
+</div>
+
+<button type="button" class="nav-scrim" onclick="closeAppNav()" aria-label="ナビゲーションを閉じる"></button>
+<div id="errorToast" class="error-toast"></div>
+
+<script>
+(function() {
+  window.toggleAppNav = function() {
+    document.body.classList.toggle('nav-open');
+  };
+
+  window.closeAppNav = function() {
+    document.body.classList.remove('nav-open');
+  };
+
+  const navLinks = Array.from(document.querySelectorAll('.side-nav a[href^="#"]'));
+  navLinks.forEach(function(link) {
+    link.addEventListener('click', window.closeAppNav);
+  });
+
+  if ('IntersectionObserver' in window) {
+    const observer = new IntersectionObserver(function(entries) {
+      const visible = entries
+        .filter(function(entry) { return entry.isIntersecting; })
+        .sort(function(a, b) { return b.intersectionRatio - a.intersectionRatio; })[0];
+      if (!visible) return;
+      navLinks.forEach(function(link) {
+        link.classList.toggle('active', link.getAttribute('href') === '#' + visible.target.id);
+      });
+    }, { rootMargin: '-20% 0px -65% 0px', threshold: [0, 0.1, 0.4] });
+
+    ['overview', 'audit-target', 'risk-model', 'sampling-design', 'quick-reference'].forEach(function(id) {
+      const section = document.getElementById(id);
+      if (section) observer.observe(section);
+    });
+  }
+
+  const buttonIcons = {
+    setStandardAttribute: 'ph-arrow-counter-clockwise',
+    copyAttributeResults: 'ph-copy',
+    exportAttributeWorksheet: 'ph-download-simple',
+    recalculateSubstantive: 'ph-calculator',
+    copySubstantiveResults: 'ph-copy',
+    exportSubstantiveWorksheet: 'ph-download-simple',
+    evaluateAttributeErrors: 'ph-check-circle',
+    addPPSErrorRow: 'ph-plus',
+    removePPSErrorRow: 'ph-minus',
+    evaluatePPSErrors: 'ph-check-circle'
+  };
+
+  document.querySelectorAll('.btn[onclick]').forEach(function(button) {
+    const action = button.getAttribute('onclick').split('(')[0];
+    const iconClass = buttonIcons[action];
+    if (!iconClass) return;
+    const icon = document.createElement('i');
+    icon.className = 'ph ' + iconClass;
+    icon.setAttribute('aria-hidden', 'true');
+    button.prepend(icon);
+  });
+})();
+</script>
+
+<script>
+(function() {
+  'use strict';
+
+  // サンプル数基準表
+  const SAMPLE_SIZE_TABLE = {
+    matrix: {
+      '0.05': { 0: 45, 1: 77, 2: 116 },
+      '0.07': { 0: 32, 1: 55, 2: 77 },
+      '0.09': { 0: 25, 1: 42, 2: 58 }
+    }
+  };
+
+  // ユーティリティ関数
+  function formatPercent(value) {
+    return isFinite(value) ? (value * 100).toFixed(2) + '%' : '—';
+  }
+
+  function formatInteger(value) {
+    return isFinite(value) ? Math.round(value).toLocaleString('ja-JP') : '—';
+  }
+
+  window.formatMoney = function(value) {
+    return isFinite(value) ? Math.round(value).toLocaleString('ja-JP') : '—';
+  };
+
+  window.parseMoney = function(str) {
+    const cleaned = String(str || '').replace(/,/g, '').replace(/[^0-9.-]/g, '');
+    const value = parseFloat(cleaned);
+    return isNaN(value) ? 0 : value;
+  };
+
+  window.formatMoneyInput = function(input) {
+    const value = window.parseMoney(input.value);
+    input.value = value.toLocaleString('ja-JP');
+  };
+
+  window.formatNumberInput = function(input) {
+    const cleaned = String(input.value || '').replace(/,/g, '').replace(/[^0-9]/g, '');
+    const value = parseInt(cleaned) || 0;
+    input.value = value.toLocaleString('ja-JP');
+  };
+
+  window.parseNumber = function(str) {
+    const cleaned = String(str || '').replace(/,/g, '').replace(/[^0-9]/g, '');
+    const value = parseInt(cleaned);
+    return isNaN(value) ? 0 : value;
+  };
+
+  function clamp(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+  }
+
+  // エラー表示
+  function showError(message) {
+    const toast = document.getElementById('errorToast');
+    toast.textContent = message;
+    toast.style.display = 'block';
+    setTimeout(() => {
+      toast.style.display = 'none';
+    }, 5000);
+  }
+
+  // ステータス更新
+  function updateStatus(message, isError = false) {
+    const status = document.getElementById('status');
+    const timestamp = new Date().toLocaleTimeString();
+    status.classList.toggle('is-error', isError);
+    status.innerHTML = '<span class="status-dot"></span>' + message + ' <span id="timestamp">' + timestamp + '</span>';
+  }
+
+  // タブ切り替え
+  window.switchTab = function(tabName) {
+    document.querySelectorAll('.tab-button').forEach(btn => {
+      btn.classList.remove('active');
+    });
+    event.target.classList.add('active');
+
+    document.querySelectorAll('.tab-content').forEach(content => {
+      content.classList.remove('active');
+    });
+    
+    document.getElementById(tabName + '-tab').classList.add('active');
+  };
+
+  // 勘定科目タイプ切り替え
+  window.toggleAccountType = function() {
+    const accountType = document.getElementById('accountType').value;
+    const bsSection = document.getElementById('bsSection');
+    const plSection = document.getElementById('plSection');
+    
+    if (accountType === 'bs') {
+      bsSection.style.display = 'block';
+      plSection.style.display = 'none';
+      document.getElementById('accountTypeDisplay').textContent = 'BS項目（貸借対照表）';
+      window.calculateBSSampling();
+    } else {
+      bsSection.style.display = 'none';
+      plSection.style.display = 'block';
+      document.getElementById('accountTypeDisplay').textContent = 'PL項目（損益計算書）';
+      window.calculatePLSampling();
+    }
+  };
+
+  // 監査リスクモデル計算
+  function calculateAuditRiskModel() {
+    const AR = parseFloat(document.getElementById('ar').value) || 0;
+    const IR = parseFloat(document.getElementById('ir').value) || 1;
+    const CR = parseFloat(document.getElementById('cr').value) || 1;
+
+    if (!(IR > 0 && CR > 0)) {
+      document.getElementById('drValue').textContent = '—';
+      document.getElementById('riaValue').textContent = '—';
+      document.getElementById('rooValue').textContent = '—';
+      return { RIA: NaN, ROO: NaN };
+    }
+
+    const DR = AR / (IR * CR);
+    const RIA = clamp(DR, 0.01, 0.20);
+    const ROO = clamp(DR * 0.5, 0.02, 0.10);
+
+    document.getElementById('drValue').textContent = formatPercent(DR);
+    document.getElementById('riaValue').textContent = formatPercent(RIA);
+    document.getElementById('rooValue').textContent = formatPercent(ROO);
+
+    return { RIA, ROO };
+  }
+
+  // 統制頻度による母集団件数の自動設定
+  window.setPopulationByFrequency = function() {
+    const frequency = document.getElementById('controlFrequency').value;
+    const populationField = document.getElementById('populationSize');
+    
+    const frequencyPopulation = {
+      'daily': 250,    // 日次は250件以上なのでデフォルト値
+      'weekly': 52,    // 週次は52週
+      'monthly': 12,   // 月次は12ヶ月
+      'quarterly': 4,  // 四半期は4回
+      'annually': 1    // 年次は1回
+    };
+    
+    if (frequency !== 'daily') {
+      populationField.value = frequencyPopulation[frequency].toLocaleString('ja-JP');
+    }
+  };
+
+  // 統制テスト計算
+  window.calculateAttributeSampling = function() {
+    const frequency = document.getElementById('controlFrequency').value;
+    const populationSize = window.parseNumber(document.getElementById('populationSize').value) || 0;
+    const expectedDeviations = parseInt(document.getElementById('expectedDeviations').value) || 0;
+    const tolerableRate = parseFloat(document.getElementById('tolerableRateNew').value) || 0.09;
+    
+    const alert = document.getElementById('attrAlert');
+    if (alert) alert.style.display = 'none';
+
+    const frequencyText = {
+      'daily': '日次・随時',
+      'weekly': '週次',
+      'monthly': '月次',
+      'quarterly': '四半期',
+      'annually': '年次'
+    }[frequency] || frequency;
+    
+    document.getElementById('attrFrequency').textContent = frequencyText;
+    document.getElementById('attrPopulation').textContent = formatInteger(populationSize);
+
+    const tenPercentRule = Math.max(2, Math.ceil(populationSize * 0.1));
+    document.getElementById('attr10Percent').textContent = formatInteger(tenPercentRule) + '件';
+
+    let sampleSize = 25;
+    let allowableDeviations = 0;
+    let additionalSamples = 17;
+
+    if (frequency === 'daily' || populationSize >= 250) {
+      const rateKey = tolerableRate.toFixed(2);
+      if (SAMPLE_SIZE_TABLE.matrix[rateKey] && 
+          SAMPLE_SIZE_TABLE.matrix[rateKey][expectedDeviations] !== undefined) {
+        sampleSize = SAMPLE_SIZE_TABLE.matrix[rateKey][expectedDeviations];
+      }
+      allowableDeviations = expectedDeviations;
+      
+      if (tolerableRate === 0.05) {
+        additionalSamples = 32;
+      } else if (tolerableRate === 0.07) {
+        additionalSamples = 23;
+      }
+    } else if (frequency === 'weekly') {
+      sampleSize = Math.min(5, populationSize);
+    } else if (frequency === 'monthly') {
+      sampleSize = Math.max(2, Math.min(3, populationSize));
+    } else if (frequency === 'quarterly') {
+      sampleSize = Math.min(1, populationSize);
+    } else if (frequency === 'annually') {
+      sampleSize = 1;
+    } else {
+      sampleSize = Math.min(25, Math.max(2, tenPercentRule));
+    }
+
+    if (populationSize < sampleSize) {
+      sampleSize = populationSize;
+      if (alert) {
+        alert.style.display = 'block';
+        alert.textContent = '母集団が推奨サンプル数より少ないため、全件を対象とします。';
+      }
+    }
+
+    document.getElementById('sampleSizeAdj').textContent = formatInteger(sampleSize);
+    document.getElementById('allowableDeviations').textContent = formatInteger(allowableDeviations);
+    document.getElementById('additionalSamples').textContent = 
+      sampleSize >= 25 ? formatInteger(additionalSamples) : 'N/A';
+  };
+
+  // BS項目のサンプリング計算
+  window.calculateBSSampling = function() {
+    const { RIA } = calculateAuditRiskModel();
+    const BV = window.parseMoney(document.getElementById('bookValue').value);
+    const TM = window.parseMoney(document.getElementById('tolerableMisstatement').value);
+    const EM = window.parseMoney(document.getElementById('expectedMisstatement').value);
+    
+    if (!isFinite(RIA) || BV <= 0 || TM <= 0) {
+      document.getElementById('finalSampleSize').textContent = '—';
+      return;
+    }
+
+    const CF = -Math.log(RIA);
+    const ratio = Math.min(EM / Math.max(TM, 1), 0.8);
+    const CFadj = CF * (1 + ratio);
+    
+    const denom = TM - EM;
+    if (denom <= 0) {
+      showError('許容誤謬は期待誤謬より大きくしてください');
+      return;
+    }
+
+    const n = Math.ceil((CFadj * BV) / denom);
+    const interval = Math.ceil(BV / n);
+    const coverage = (n * interval) / BV;
+    const startPoint = Math.floor(Math.random() * interval) + 1;
+
+    document.getElementById('samplingMethodDisplay').textContent = 'PPS/MUSサンプリング';
+    document.getElementById('riskAssessment').textContent = `受入リスク: ${formatPercent(RIA)}`;
+    document.getElementById('finalSampleSize').textContent = formatInteger(n);
+    document.getElementById('samplingInterval').textContent = window.formatMoney(interval) + '円';
+    document.getElementById('startingPoint').textContent = window.formatMoney(startPoint) + '円目';
+    document.getElementById('coverageRate').textContent = formatPercent(coverage);
+    document.getElementById('recommendedProcedures').textContent = '金額確認、実査、再計算';
+  };
+
+  // PL項目のサンプリング計算（改善版：信頼度と許容誤謬率を考慮）
+  window.calculatePLSampling = function() {
+    const transactionCount = window.parseNumber(document.getElementById('plTransactionCount').value) || 0;
+    const totalAmount = window.parseMoney(document.getElementById('plTotalAmount').value);
+    const materiality = window.parseMoney(document.getElementById('plMateriality').value);
+    const confidenceLevel = parseFloat(document.getElementById('plConfidenceLevel').value) || 0.95;
+    const riskLevel = document.getElementById('plRiskLevel').value;
+    const assertionType = document.getElementById('plAssertionType').value;
+    const samplingMethod = document.getElementById('plSamplingMethod').value;
+    
+    if (transactionCount <= 0 || totalAmount <= 0 || materiality <= 0) {
+      document.getElementById('finalSampleSize').textContent = '—';
+      return;
+    }
+
+    // 許容誤謬率と予想誤謬率の計算
+    const tolerableErrorRate = materiality / totalAmount;
+    const expectedErrorRates = {
+      'low': 0.005,   // 0.5%
+      'medium': 0.01,  // 1.0%
+      'high': 0.02     // 2.0%
+    };
+    const expectedErrorRate = expectedErrorRates[riskLevel];
+
+    // 信頼係数（Z値）
+    const confidenceFactors = {
+      0.90: 1.65,
+      0.95: 1.96,
+      0.99: 2.58
+    };
+    const Z = confidenceFactors[confidenceLevel];
+
+    // 基本サンプル率（95%信頼度基準）
+    const baseSampleRates = {
+      'low': 0.0075,
+      'medium': 0.015,
+      'high': 0.025
+    };
+    
+    const minSamples = {
+      'low': 30,
+      'medium': 60,
+      'high': 90
+    };
+
+    // 1. 基本サンプル数の計算
+    let baseSampleSize = Math.max(
+      Math.ceil(transactionCount * baseSampleRates[riskLevel]),
+      minSamples[riskLevel]
+    );
+
+    // 2. 信頼度による調整
+    const confidenceAdjustment = Z / 1.96;  // 95%を基準とした調整
+    baseSampleSize = Math.ceil(baseSampleSize * confidenceAdjustment);
+
+    // 3. 許容誤謬率による調整
+    let materialityAdjustment = 1.0;
+    
+    if (!document.getElementById('ignoreMaterialityAdjustment').checked) {
+      if (tolerableErrorRate < 0.01) {  // 1%未満
+        materialityAdjustment = 1.5;
+      } else if (tolerableErrorRate < 0.02) {  // 2%未満
+        materialityAdjustment = 1.2;
+      } else if (tolerableErrorRate > 0.05) {  // 5%超
+        materialityAdjustment = 0.8;
+      }
+      baseSampleSize = Math.ceil(baseSampleSize * materialityAdjustment);
+    }
+
+    // 4. 監査要点による調整
+    if (assertionType === 'completeness') {
+      baseSampleSize = Math.ceil(baseSampleSize * 1.5);
+    }
+
+    // 5. サンプリング手法による調整
+    if (samplingMethod === 'stratified' && !document.getElementById('ignoreStratification')?.checked) {
+      baseSampleSize = Math.ceil(baseSampleSize * 0.85);
+    }
+
+    // 6. 上限値の適用
+    const maxSampleSize = Math.min(
+      Math.ceil(transactionCount * 0.1),  // 最大10%
+      500  // 絶対上限500件
+    );
+    baseSampleSize = Math.min(baseSampleSize, maxSampleSize);
+
+    // 7. 分析値の計算と表示
+    const avgTransaction = totalAmount / transactionCount;
+    const specificThreshold = materiality * 0.5;  // 重要性の50%
+    
+    // 重要性分析の表示
+    document.getElementById('tolerableErrorRate').textContent = formatPercent(tolerableErrorRate);
+    document.getElementById('expectedErrorRate').textContent = formatPercent(expectedErrorRate);
+    document.getElementById('avgTransactionAmount').textContent = window.formatMoney(avgTransaction) + '円';
+    document.getElementById('specificItemThreshold').textContent = window.formatMoney(specificThreshold) + '円';
+    document.getElementById('confidenceAdjustment').textContent = '×' + confidenceAdjustment.toFixed(2);
+    document.getElementById('materialityAdjustment').textContent = '×' + materialityAdjustment.toFixed(2);
+
+    // 階層化推奨の判定
+    const materialityMultiple = materiality / avgTransaction;
+    const stratRecommend = document.getElementById('stratificationRecommendation');
+    const ignoreStrat = document.getElementById('ignoreStratification');
+    
+    if (materialityMultiple < 20 && samplingMethod !== 'stratified') {
+      stratRecommend.style.display = 'block';
+      
+      // チェックボックスがチェックされている場合は折りたたむ
+      if (ignoreStrat && ignoreStrat.checked) {
+        const details = document.getElementById('stratificationDetails');
+        const toggle = document.getElementById('stratToggle');
+        if (details) details.style.display = 'none';
+        if (toggle) toggle.textContent = '▶';
+      }
+    } else {
+      stratRecommend.style.display = 'none';
+    }
+
+    // 結果の表示
+    const interval = Math.ceil(transactionCount / baseSampleSize);
+    const coverage = baseSampleSize / transactionCount;
+    const startPoint = Math.floor(Math.random() * interval) + 1;
+
+    const methodNames = {
+      'systematic': '系統的サンプリング',
+      'random': 'ランダムサンプリング',
+      'stratified': '階層化サンプリング'
+    };
+
+    const riskNames = {
+      'low': '低リスク（予想誤謬率0.5%）',
+      'medium': '中リスク（予想誤謬率1.0%）',
+      'high': '高リスク（予想誤謬率2.0%）'
+    };
+
+    const procedures = {
+      'occurrence': '証憑突合、得意先確認',
+      'completeness': '連番管理確認、カットオフテスト',
+      'accuracy': '再計算、証憑金額照合',
+      'cutoff': '期間帰属テスト、出荷/検収確認'
+    };
+
+    document.getElementById('samplingMethodDisplay').textContent = methodNames[samplingMethod];
+    document.getElementById('riskAssessment').textContent = riskNames[riskLevel];
+    document.getElementById('finalSampleSize').textContent = formatInteger(baseSampleSize);
+    document.getElementById('samplingInterval').textContent = `${interval}件ごと`;
+    document.getElementById('startingPoint').textContent = `${startPoint}件目`;
+    document.getElementById('coverageRate').textContent = formatPercent(coverage);
+    document.getElementById('recommendedProcedures').textContent = procedures[assertionType];
+
+    // アラート表示の更新
+    const alert = document.getElementById('substantiveAlert');
+    if (assertionType === 'completeness') {
+      alert.style.display = 'block';
+      alert.className = 'alert info';
+      alert.textContent = '網羅性の検証では、サンプル数を1.5倍に増加しています。また、連番管理やカットオフテストなど、追加的な手続きの実施を推奨します。';
+    } else if (riskLevel === 'high' && tolerableErrorRate < 0.02) {
+      alert.style.display = 'block';
+      alert.className = 'alert warning';
+      alert.textContent = `高リスクかつ許容誤謬率が低い（${formatPercent(tolerableErrorRate)}）ため、慎重な検証が必要です。統制の改善提案や不正リスク対応手続きの実施を検討してください。`;
+    } else if (tolerableErrorRate < 0.01 && !document.getElementById('ignoreMaterialityAdjustment').checked) {
+      alert.style.display = 'block';
+      alert.className = 'alert info';
+      alert.textContent = `許容誤謬率が${formatPercent(tolerableErrorRate)}と低いため、サンプル数を${materialityAdjustment}倍に増加しています。特定項目抽出（${window.formatMoney(specificThreshold)}円以上）との併用を推奨します。`;
+    } else if (confidenceLevel === 0.99) {
+      alert.style.display = 'block';
+      alert.className = 'alert info';
+      alert.textContent = '99%信頼度（厳格基準）を適用しています。高い信頼性が得られますが、サンプル数も増加します。';
+    } else {
+      alert.style.display = 'none';
+    }
+  };
+
+  // PL算定ロジック説明の折り畳み
+  window.togglePLLogicExplanation = function() {
+    const content = document.getElementById('plLogicExplanation');
+    const toggle = document.getElementById('plLogicToggle');
+    
+    if (content.style.display === 'none') {
+      content.style.display = 'block';
+      toggle.textContent = '▲';
+    } else {
+      content.style.display = 'none';
+      toggle.textContent = '▼';
+    }
+  };
+
+  // BS算定ロジック説明の折り畳み
+  window.toggleBSLogicExplanation = function() {
+    const content = document.getElementById('bsLogicExplanation');
+    const toggle = document.getElementById('bsLogicToggle');
+    
+    if (content.style.display === 'none') {
+      content.style.display = 'block';
+      toggle.textContent = '▲';
+    } else {
+      content.style.display = 'none';
+      toggle.textContent = '▼';
+    }
+  };
+
+  // 階層化推奨詳細の折り畳み
+  window.toggleStratificationDetails = function() {
+    const details = document.getElementById('stratificationDetails');
+    const toggle = document.getElementById('stratToggle');
+    
+    if (details.style.display === 'none') {
+      details.style.display = 'block';
+      toggle.textContent = '▼';
+    } else {
+      details.style.display = 'none';
+      toggle.textContent = '▶';
+    }
+  };
+
+  // サンプリング方式の切り替え
+  window.toggleSamplingMethod = function() {
+    const method = document.getElementById('samplingMethod').value;
+    const statisticalSections = [document.getElementById('bsSection'), document.getElementById('plSection')];
+    const nonStatSection = document.getElementById('nonStatisticalSection');
+    
+    if (method === 'non-statistical') {
+      statisticalSections.forEach(section => {
+        if (section) section.style.display = 'none';
+      });
+      if (nonStatSection) nonStatSection.style.display = 'block';
+      calculateNonStatistical();
+    } else {
+      const accountType = document.getElementById('accountType').value;
+      if (accountType === 'bs') {
+        if (document.getElementById('bsSection')) document.getElementById('bsSection').style.display = 'block';
+        if (document.getElementById('plSection')) document.getElementById('plSection').style.display = 'none';
+      } else {
+        if (document.getElementById('bsSection')) document.getElementById('bsSection').style.display = 'none';
+        if (document.getElementById('plSection')) document.getElementById('plSection').style.display = 'block';
+      }
+      if (nonStatSection) nonStatSection.style.display = 'none';
+      window.toggleAccountType();
+    }
+  };
+
+  // 非統計的サンプリング計算
+  window.calculateNonStatistical = function() {
+    // ベースラインサンプル数
+    const baselines = {
+      'low': { small: 15, medium: 20, large: 25 },
+      'medium': { small: 20, medium: 30, large: 40 },
+      'high': { small: 30, medium: 45, large: 60 }
+    };
+    
+    const scale = document.getElementById('nsPopulationScale').value;
+    const risk = document.getElementById('nsRiskAssessment').value;
+    const materiality = document.getElementById('nsMaterialityLevel').value;
+    
+    let baseSample = baselines[risk][scale];
+    
+    // 重要性による調整
+    if (materiality === 'high') {
+      baseSample = Math.ceil(baseSample * 1.3);
+    } else if (materiality === 'low') {
+      baseSample = Math.ceil(baseSample * 0.8);
+    }
+    
+    // 過去の発見事項による調整
+    const priorFindings = document.getElementById('nsPriorFindings').value;
+    if (priorFindings === 'significant') {
+      baseSample = Math.ceil(baseSample * 1.5);
+    } else if (priorFindings === 'minor') {
+      baseSample = Math.ceil(baseSample * 1.2);
+    }
+    
+    // チェックボックスによる調整
+    let adjustment = 1.0;
+    if (document.getElementById('nsNewSystem')?.checked) adjustment *= 1.5;
+    if (document.getElementById('nsKeyAccount')?.checked) adjustment *= 1.3;
+    if (document.getElementById('nsAutomated')?.checked) adjustment *= 0.7;
+    if (document.getElementById('nsAnalytical')?.checked) adjustment *= 0.8;
+    
+    // 最終サンプル数
+    let finalSample = Math.ceil(baseSample * adjustment);
+    finalSample = Math.max(15, Math.min(500, finalSample)); // 15-500の範囲
+    
+    // 表示更新
+    document.getElementById('nsSuggestedSample').textContent = finalSample + '件';
+    document.getElementById('nsFinalSampleSize').value = finalSample;
+    
+    // 統計的手法との比較（参考値）
+    const statComparison = Math.ceil(finalSample * 1.8); // 統計的手法は通常1.5-2倍
+    document.getElementById('nsStatisticalComparison').textContent = statComparison + '件（推定）';
+    
+    // 比較表の更新
+    document.getElementById('compStatSample').textContent = statComparison + '件';
+    document.getElementById('compNonStatSample').textContent = finalSample + '件';
+    
+    // 結果表示の更新
+    document.getElementById('samplingMethodDisplay').textContent = '非統計的サンプリング';
+    document.getElementById('riskAssessment').textContent = risk === 'high' ? '高リスク' : risk === 'medium' ? '中リスク' : '低リスク';
+    document.getElementById('finalSampleSize').textContent = finalSample;
+    document.getElementById('samplingInterval').textContent = '—（非統計的）';
+    document.getElementById('startingPoint').textContent = '—（非統計的）';
+    document.getElementById('coverageRate').textContent = '—（非統計的）';
+    document.getElementById('recommendedProcedures').textContent = '判断に基づく選定';
+  };
+
+  // 早見表の折り畳み
+  window.toggleQuickReference = function() {
+    const content = document.getElementById('quickReference');
+    const toggle = document.getElementById('quickRefToggle');
+    
+    if (content.style.display === 'none') {
+      content.style.display = 'block';
+      toggle.textContent = '▲';
+    } else {
+      content.style.display = 'none';
+      toggle.textContent = '▼';
+    }
+  };
+
+  // エラー評価セクションの折り畳み
+  window.toggleAttrErrorSection = function() {
+    const content = document.getElementById('attrErrorContent');
+    const toggle = document.getElementById('attrErrorToggle');
+    
+    if (content.style.display === 'none') {
+      content.style.display = 'block';
+      toggle.textContent = '▲';
+    } else {
+      content.style.display = 'none';
+      toggle.textContent = '▼';
+    }
+  };
+
+  window.togglePPSErrorSection = function() {
+    const content = document.getElementById('ppsErrorContent');
+    const toggle = document.getElementById('ppsErrorToggle');
+    
+    if (content.style.display === 'none') {
+      content.style.display = 'block';
+      toggle.textContent = '▲';
+    } else {
+      content.style.display = 'none';
+      toggle.textContent = '▼';
+    }
+  };
+
+  window.toggleAuditOpinionSection = function() {
+    const content = document.getElementById('auditOpinionContent');
+    const toggle = document.getElementById('auditOpinionToggle');
+    
+    if (content.style.display === 'none') {
+      content.style.display = 'block';
+      toggle.textContent = '▲';
+    } else {
+      content.style.display = 'none';
+      toggle.textContent = '▼';
+    }
+  };
+
+  // ズーム機能
+  let currentZoom = 100;
+  
+  window.adjustZoom = function(delta) {
+    currentZoom = Math.max(50, Math.min(200, currentZoom + delta));
+    applyZoom();
+  };
+  
+  window.resetZoom = function() {
+    currentZoom = 100;
+    applyZoom();
+  };
+  
+  function applyZoom() {
+    document.body.style.zoom = currentZoom + '%';
+    document.getElementById('zoomLevel').textContent = currentZoom + '%';
+    
+    // ローカルストレージに保存
+    localStorage.setItem('auditToolZoom', currentZoom);
+  }
+  
+  // キーボードショートカット
+  document.addEventListener('keydown', function(e) {
+    if (e.ctrlKey || e.metaKey) {
+      if (e.key === '+' || e.key === '=') {
+        e.preventDefault();
+        adjustZoom(10);
+      } else if (e.key === '-') {
+        e.preventDefault();
+        adjustZoom(-10);
+      } else if (e.key === '0') {
+        e.preventDefault();
+        resetZoom();
+      }
+    }
+  });
+
+  // 特定項目抽出セクションの折り畳み
+  window.toggleSpecificItems = function() {
+    const content = document.getElementById('specificItemsContent');
+    const toggle = document.getElementById('specificItemsToggle');
+    
+    if (content.style.display === 'none') {
+      content.style.display = 'block';
+      toggle.textContent = '▲';
+    } else {
+      content.style.display = 'none';
+      toggle.textContent = '▼';
+    }
+  };
+
+  // 特定項目の更新と母集団調整
+  window.updateSpecificItems = function() {
+    let totalCount = 0;
+    let totalAmount = 0;
+    
+    // 重要性基準の計算
+    const materiality = window.parseMoney(document.getElementById('materiality')?.value) || 
+                       window.parseMoney(document.getElementById('plMateriality')?.value) || 20000000;
+    const thresholdPercent = parseInt(document.getElementById('specificThresholdPercent').value) || 75;
+    const thresholdAmount = materiality * (thresholdPercent / 100);
+    
+    document.getElementById('specificThresholdAmount').textContent = window.formatMoney(thresholdAmount) + '円';
+    document.getElementById('siHighValueCriteria').textContent = window.formatMoney(thresholdAmount) + '円超';
+    
+    // 各カテゴリの件数を集計
+    const categories = [
+      { id: 'HighValue', avgAmount: thresholdAmount * 1.5 },
+      { id: 'Unusual', avgAmount: 5000000 },
+      { id: 'RelatedParty', avgAmount: 8000000 },
+      { id: 'ManualJournal', avgAmount: 3000000 },
+      { id: 'PeriodEnd', avgAmount: 4000000 },
+      { id: 'NewCustomer', avgAmount: 6000000 }
+    ];
+    
+    categories.forEach(cat => {
+      const checkbox = document.getElementById(`si${cat.id}`);
+      const countInput = document.getElementById(`si${cat.id}Count`);
+      
+      if (checkbox && checkbox.checked && countInput) {
+        const count = parseInt(countInput.value) || 0;
+        totalCount += count;
+        totalAmount += count * cat.avgAmount;
+      }
+    });
+    
+    // 表示更新
+    document.getElementById('totalSpecificItems').textContent = totalCount + ' 件';
+    document.getElementById('specificItemCount').textContent = totalCount + ' 件';
+    
+    // カバー率計算
+    const totalPopulation = window.parseMoney(document.getElementById('bookValue')?.value) || 
+                           window.parseMoney(document.getElementById('plTotalAmount')?.value) || 500000000;
+    const coverage = totalPopulation > 0 ? (totalAmount / totalPopulation) * 100 : 0;
+    document.getElementById('specificCoverage').textContent = coverage.toFixed(1) + '%';
+    
+    // 元の母集団表示
+    const originalCount = window.parseNumber(document.getElementById('bsPopulationCount')?.value) || 
+                         window.parseNumber(document.getElementById('plTransactionCount')?.value) || 1000;
+    document.getElementById('originalPopulation').textContent = 
+      window.formatMoney(totalPopulation) + '円（' + originalCount.toLocaleString('ja-JP') + '件）';
+    
+    // 調整後母集団の計算
+    const adjustedAmount = Math.max(0, totalPopulation - totalAmount);
+    const adjustedCount = Math.max(0, originalCount - totalCount);
+    
+    document.getElementById('adjustedPopulation').textContent = 
+      window.formatMoney(adjustedAmount) + '円（' + adjustedCount.toLocaleString('ja-JP') + '件）';
+    
+    // 調整通知の表示制御
+    const adjustmentNotice = document.getElementById('adjustmentNotice');
+    if (adjustmentNotice) {
+      adjustmentNotice.style.display = totalCount > 0 ? 'block' : 'none';
+    }
+    
+    // データ属性に保存（後の計算で使用）
+    if (document.getElementById('bookValue')) {
+      document.getElementById('bookValue').dataset.adjusted = adjustedAmount;
+    }
+    if (document.getElementById('plTotalAmount')) {
+      document.getElementById('plTotalAmount').dataset.adjusted = adjustedAmount;
+    }
+    if (document.getElementById('plTransactionCount')) {
+      document.getElementById('plTransactionCount').dataset.adjusted = adjustedCount;
+    }
+    
+    // サンプル数の再計算（既存の計算関数を呼び出し）
+    const accountType = document.getElementById('accountType')?.value;
+    if (accountType === 'bs') {
+      window.calculateBSSampling();
+    } else if (accountType === 'pl') {
+      window.calculatePLSampling();
+    }
+  };
+
+  // 実証手続再計算
+  window.recalculateSubstantive = function() {
+    const accountType = document.getElementById('accountType').value;
+    if (accountType === 'bs') {
+      window.calculateBSSampling();
+    } else {
+      window.calculatePLSampling();
+    }
+    updateStatus('計算完了');
+  };
+
+  // エラー評価関数
+  window.evaluateAttributeErrors = function() {
+    const sampleSize = parseInt(document.getElementById('attrSampleSize').value) || 0;
+    const deviations = parseInt(document.getElementById('attrDeviations').value) || 0;
+    
+    if (sampleSize <= 0) {
+      showError('サンプル数を入力してください');
+      return;
+    }
+    
+    const deviationRate = deviations / sampleSize;
+    document.getElementById('attrDeviationRate').textContent = formatPercent(deviationRate);
+    
+    const z = 1.645;
+    const n = sampleSize;
+    const p = deviationRate;
+    
+    const denominator = 1 + z * z / n;
+    const center = (p + z * z / (2 * n)) / denominator;
+    const margin = (z * Math.sqrt(p * (1 - p) / n + z * z / (4 * n * n))) / denominator;
+    const upperLimit = Math.min(1, center + margin);
+    
+    document.getElementById('attrUpperLimit').textContent = formatPercent(upperLimit);
+    
+    const tolerableRate = 0.09;
+    const alert = document.getElementById('attrEvalAlert');
+    
+    let evalResult = '';
+    let requiredAction = '';
+    
+    if (deviations === 0) {
+      evalResult = '有効（逸脱なし）';
+      requiredAction = '追加手続き不要';
+      if (alert) alert.style.display = 'none';
+    } else if (deviations === 1 && sampleSize === 25) {
+      evalResult = '追加サンプル必要';
+      requiredAction = '17件の追加サンプルを抽出';
+      if (alert) {
+        alert.style.display = 'block';
+        alert.className = 'alert warning';
+        alert.textContent = '1件の逸脱が発見されました。17件の追加サンプルを抽出し、追加サンプルで逸脱がなければ統制は有効と判断できます。';
+      }
+    } else if (upperLimit <= tolerableRate) {
+      evalResult = '条件付き有効';
+      requiredAction = '実証手続きを若干増加';
+      if (alert) {
+        alert.style.display = 'block';
+        alert.className = 'alert warning';
+        alert.textContent = `上限逸脱率（${formatPercent(upperLimit)}）が許容逸脱率（${formatPercent(tolerableRate)}）以下のため、統制は条件付きで有効です。`;
+      }
+    } else {
+      evalResult = '無効（統制の不備）';
+      requiredAction = '実証手続きを大幅増加';
+      if (alert) {
+        alert.style.display = 'block';
+        alert.className = 'alert danger';
+        alert.textContent = `上限逸脱率（${formatPercent(upperLimit)}）が許容逸脱率（${formatPercent(tolerableRate)}）を超過しています。`;
+      }
+    }
+    
+    document.getElementById('attrEvalResult').textContent = evalResult;
+    document.getElementById('attrRequiredAction').textContent = requiredAction;
+    
+    updateStatus('統制エラー評価完了');
+  };
+
+  // PPSエラー行追加
+  window.addPPSErrorRow = function() {
+    const container = document.getElementById('ppsErrorDetails');
+    const rowCount = container.children.length + 1;
+    
+    const newRow = document.createElement('div');
+    newRow.className = 'error-detail-row';
+    newRow.style.cssText = 'display: flex; gap: 12px; margin-bottom: 8px;';
+    newRow.innerHTML = `
+      <input type="text" class="form-input money-input" placeholder="簿価" style="flex: 1;" id="ppsBookValue${rowCount}" onblur="window.formatMoneyInput(this); window.calculateOverstatement(${rowCount});">
+      <input type="text" class="form-input money-input" placeholder="監査後価値" style="flex: 1;" id="ppsAuditValue${rowCount}" onblur="window.formatMoneyInput(this); window.calculateOverstatement(${rowCount});">
+      <input type="text" class="form-input" placeholder="過大計上額" style="flex: 1;" id="ppsOverstatement${rowCount}" readonly>
+    `;
+    
+    container.appendChild(newRow);
+  };
+  
+  window.removePPSErrorRow = function() {
+    const container = document.getElementById('ppsErrorDetails');
+    if (container.children.length > 1) {
+      container.removeChild(container.lastElementChild);
+    } else {
+      showError('最低1行は必要です');
+    }
+  };
+  
+  window.calculateOverstatement = function(rowNum) {
+    const bookValueField = document.getElementById(`ppsBookValue${rowNum}`);
+    const auditValueField = document.getElementById(`ppsAuditValue${rowNum}`);
+    const overstatementField = document.getElementById(`ppsOverstatement${rowNum}`);
+    
+    if (bookValueField && auditValueField && overstatementField) {
+      const bookValue = window.parseMoney(bookValueField.value);
+      const auditValue = window.parseMoney(auditValueField.value);
+      const overstatement = Math.max(0, bookValue - auditValue);
+      overstatementField.value = window.formatMoney(overstatement);
+    }
+  };
+
+  window.evaluatePPSErrors = function() {
+    const sampleCount = parseInt(document.getElementById('ppsSampleCount').value) || 0;
+    const tolerableMisstatement = window.parseMoney(document.getElementById('tolerableMisstatement').value) || 10000000;
+    const bookValue = window.parseMoney(document.getElementById('bookValue').value) || 500000000;
+    
+    if (sampleCount <= 0) {
+      showError('サンプル数を入力してください');
+      return;
+    }
+    
+    const samplingInterval = bookValue / sampleCount;
+    const confidenceFactors = [2.31, 3.89, 5.33, 6.69, 8.00];
+    
+    const basicPrecision = confidenceFactors[0] * samplingInterval;
+    document.getElementById('ppsBasicPrecision').textContent = window.formatMoney(basicPrecision);
+    
+    let errorAmounts = [];
+    const container = document.getElementById('ppsErrorDetails');
+    for (let i = 1; i <= container.children.length; i++) {
+      const bookVal = window.parseMoney(document.getElementById(`ppsBookValue${i}`)?.value || 0);
+      const auditVal = window.parseMoney(document.getElementById(`ppsAuditValue${i}`)?.value || 0);
+      const overstatement = bookVal - auditVal;
+      if (overstatement > 0) {
+        errorAmounts.push(overstatement);
+      }
+    }
+    
+    errorAmounts.sort((a, b) => b - a);
+    
+    let incrementalAllowance = 0;
+    let projectedMisstatement = 0;
+    
+    if (errorAmounts.length > 0) {
+      for (let i = 0; i < Math.min(errorAmounts.length, 4); i++) {
+        const taintingRate = Math.min(1, errorAmounts[i] / samplingInterval);
+        const projectedError = taintingRate * samplingInterval;
+        projectedMisstatement += projectedError;
+        
+        if (i === 0) {
+          incrementalAllowance += projectedError * (confidenceFactors[1] - confidenceFactors[0]) / confidenceFactors[0];
+        } else {
+          incrementalAllowance += projectedError * (confidenceFactors[i + 1] - confidenceFactors[i]) / confidenceFactors[0];
+        }
+      }
+    }
+    
+    document.getElementById('ppsIncrementalAllowance').textContent = window.formatMoney(incrementalAllowance);
+    
+    const upperMisstatementLimit = basicPrecision + projectedMisstatement + incrementalAllowance;
+    document.getElementById('ppsUpperLimit').textContent = window.formatMoney(upperMisstatementLimit);
+    document.getElementById('ppsTolerable').textContent = window.formatMoney(tolerableMisstatement);
+    
+    const alert = document.getElementById('ppsEvalAlert');
+    let evalResult = '';
+    
+    if (upperMisstatementLimit < tolerableMisstatement * 0.5) {
+      evalResult = '受入可能（余裕あり）';
+      if (alert) {
+        alert.style.display = 'block';
+        alert.className = 'alert info';
+        alert.textContent = `推定誤謬上限（${window.formatMoney(upperMisstatementLimit)}円）が許容誤謬の50%未満のため、十分な余裕をもって受入可能です。`;
+      }
+    } else if (upperMisstatementLimit < tolerableMisstatement * 0.75) {
+      evalResult = '受入可能（標準）';
+      if (alert) {
+        alert.style.display = 'block';
+        alert.className = 'alert info';
+        alert.textContent = `推定誤謬上限（${window.formatMoney(upperMisstatementLimit)}円）が許容誤謬以下のため受入可能です。`;
+      }
+    } else if (upperMisstatementLimit < tolerableMisstatement) {
+      evalResult = '受入可能（条件付き）';
+      if (alert) {
+        alert.style.display = 'block';
+        alert.className = 'alert warning';
+        alert.textContent = `推定誤謬上限（${window.formatMoney(upperMisstatementLimit)}円）が許容誤謬に近いため、翌期の監査計画で留意が必要です。`;
+      }
+    } else {
+      evalResult = '受入不可（追加手続必要）';
+      if (alert) {
+        alert.style.display = 'block';
+        alert.className = 'alert danger';
+        alert.textContent = `推定誤謬上限（${window.formatMoney(upperMisstatementLimit)}円）が許容誤謬（${window.formatMoney(tolerableMisstatement)}円）を超過しています。`;
+      }
+    }
+    
+    document.getElementById('ppsEvalResult').textContent = evalResult;
+    updateStatus('実証エラー評価完了');
+  };
+
+  // その他の関数
+  window.setStandardAttribute = function() {
+    document.getElementById('controlFrequency').value = 'daily';
+    document.getElementById('populationSize').value = '1000';
+    document.getElementById('expectedDeviations').value = '0';
+    document.getElementById('tolerableRateNew').value = '0.09';
+    
+    window.calculateAttributeSampling();
+    updateStatus('標準設定（25件基準）を適用しました');
+  };
+
+  window.copyAttributeResults = function() {
+    const results = [
+      ['統制頻度', document.getElementById('attrFrequency').textContent],
+      ['母集団件数', document.getElementById('attrPopulation').textContent],
+      ['10%ルール', document.getElementById('attr10Percent').textContent],
+      ['必要サンプル数', document.getElementById('sampleSizeAdj').textContent],
+      ['許容逸脱件数', document.getElementById('allowableDeviations').textContent],
+      ['追加サンプル数', document.getElementById('additionalSamples').textContent]
+    ];
+    
+    const text = results.map(row => row.join('\t')).join('\n');
+    copyToClipboard(text, '統制テスト結果をコピーしました');
+  };
+
+  window.copySubstantiveResults = function() {
+    const results = [
+      ['勘定科目タイプ', document.getElementById('accountTypeDisplay').textContent],
+      ['サンプリング手法', document.getElementById('samplingMethodDisplay').textContent],
+      ['リスク評価', document.getElementById('riskAssessment').textContent],
+      ['必要サンプル数', document.getElementById('finalSampleSize').textContent],
+      ['サンプリング間隔', document.getElementById('samplingInterval').textContent],
+      ['開始地点', document.getElementById('startingPoint').textContent],
+      ['カバレッジ率', document.getElementById('coverageRate').textContent],
+      ['推奨追加手続', document.getElementById('recommendedProcedures').textContent]
+    ];
+    
+    const text = results.map(row => row.join('\t')).join('\n');
+    copyToClipboard(text, '実証手続結果をコピーしました');
+  };
+
+  window.exportAttributeWorksheet = function() {
+    const company = document.getElementById('company').value || '[会社名]';
+    const fiscalYear = document.getElementById('fiscalYear').value || '[会計年度]';
+    const date = new Date().toLocaleDateString('ja-JP');
+    
+    // エラー評価の値を取得
+    const attrSampleSize = document.getElementById('attrSampleSize')?.value || '';
+    const attrDeviations = document.getElementById('attrDeviations')?.value || '';
+    const attrEvalResult = document.getElementById('attrEvalResult')?.textContent || '';
+    
+    const content = `統制テスト調書
+
+対象会社: ${company}
+会計年度: ${fiscalYear}
+作成日: ${date}
+
+【サンプリング結果】
+統制頻度: ${document.getElementById('attrFrequency').textContent}
+母集団件数: ${document.getElementById('attrPopulation').textContent}
+必要サンプル数: ${document.getElementById('sampleSizeAdj').textContent}
+許容逸脱件数: ${document.getElementById('allowableDeviations').textContent}
+
+【誤謬評価】
+実施サンプル数: ${attrSampleSize}件
+発見逸脱数: ${attrDeviations}件
+評価結果: ${attrEvalResult}
+
+【結論】
+[  ] 統制は有効（逸脱なし）
+[  ] 追加サンプル実施
+[  ] 統制は無効
+
+監査責任者: ________________  日付: ____________`;
+
+    downloadTextFile(content, `統制テスト調書_${new Date().toISOString().split('T')[0]}.txt`);
+    updateStatus('統制テスト調書を出力しました');
+  };
+
+  window.exportSubstantiveWorksheet = function() {
+    const accountType = document.getElementById('accountType').value;
+    const samplingMethod = document.getElementById('samplingMethod')?.value || 'statistical';
+    const company = document.getElementById('company').value || '[会社名]';
+    const fiscalYear = document.getElementById('fiscalYear').value || '[会計年度]';
+    const account = document.getElementById('account').value || '[勘定科目]';
+    const assertion = document.getElementById('assertion')?.value || '[アサーション]';
+    const date = new Date().toLocaleDateString('ja-JP');
+    
+    // エラー評価の値を取得
+    const ppsSampleCount = document.getElementById('ppsSampleCount')?.value || '';
+    const ppsErrorCount = document.getElementById('ppsErrorCount')?.value || '';
+    const ppsEvalResult = document.getElementById('ppsEvalResult')?.textContent || '';
+    const errorNature = document.getElementById('errorNature')?.options[document.getElementById('errorNature')?.selectedIndex]?.text || '';
+    const errorCause = document.getElementById('errorCause')?.value || '';
+    const otherImpact = document.getElementById('otherImpact')?.value || '';
+    const managementResponse = document.getElementById('managementResponse')?.value || '';
+    
+    let content = `実証手続サンプリング調書
+
+========================================
+【基本情報】
+========================================
+対象会社: ${company}
+会計年度: ${fiscalYear}
+勘定科目: ${account}
+アサーション: ${assertion}
+勘定科目タイプ: ${document.getElementById('accountTypeDisplay').textContent}
+サンプリング方式: ${samplingMethod === 'statistical' ? '統計的サンプリング' : '非統計的サンプリング'}
+作成日: ${date}
+作成者: ________________
+査閲者: ________________
+
+========================================
+【特定項目抽出】
+========================================
+◆ 抽出基準
+金額基準：${document.getElementById('specificThresholdAmount')?.textContent || '—'}（重要性の${document.getElementById('specificThresholdPercent')?.value || '—'}%）
+
+◆ 抽出結果
+高額項目：${document.getElementById('siHighValueCount')?.value || '0'}件
+異常項目：${document.getElementById('siUnusualCount')?.value || '0'}件
+関連当事者取引：${document.getElementById('siRelatedPartyCount')?.value || '0'}件
+手動仕訳：${document.getElementById('siManualJournalCount')?.value || '0'}件
+期末日付近取引：${document.getElementById('siPeriodEndCount')?.value || '0'}件
+新規取引先：${document.getElementById('siNewCustomerCount')?.value || '0'}件
+─────────────────
+合計：${document.getElementById('totalSpecificItems')?.textContent || '0件'}
+カバー率：${document.getElementById('specificCoverage')?.textContent || '0%'}
+
+◆ 抽出根拠
+${document.getElementById('specificItemRationale')?.value || ''}
+
+◆ 母集団の調整
+元の母集団：${document.getElementById('originalPopulation')?.textContent || '—'}
+特定項目控除後：${document.getElementById('adjustedPopulation')?.textContent || '—'}
+
+========================================
+【サンプリング計画】
+========================================
+`;
+
+    if (samplingMethod === 'non-statistical') {
+      const nsJudgment = document.getElementById('nsJudgmentRationale')?.value || '';
+      content += `◆ 非統計的サンプリング
+母集団規模: ${document.getElementById('nsPopulationScale')?.options[document.getElementById('nsPopulationScale')?.selectedIndex]?.text || ''}
+リスク評価: ${document.getElementById('nsRiskAssessment')?.options[document.getElementById('nsRiskAssessment')?.selectedIndex]?.text || ''}
+最終サンプル数: ${document.getElementById('nsFinalSampleSize')?.value || ''}件
+
+【判断根拠】
+${nsJudgment}
+`;
+    } else {
+      content += `◆ 統計的サンプリング
+サンプリング手法: ${document.getElementById('samplingMethodDisplay').textContent}
+リスク評価: ${document.getElementById('riskAssessment').textContent}
+必要サンプル数: ${document.getElementById('finalSampleSize').textContent}
+サンプリング間隔: ${document.getElementById('samplingInterval').textContent}
+開始地点: ${document.getElementById('startingPoint').textContent}
+カバレッジ率: ${document.getElementById('coverageRate').textContent}
+`;
+    }
+
+    content += `
+推奨追加手続: ${document.getElementById('recommendedProcedures').textContent}
+
+`;
+
+    if (accountType === 'bs') {
+      content += `【BS項目詳細】
+母集団簿価: ${window.formatMoney(window.parseMoney(document.getElementById('bookValue').value))}円
+勘定重要性: ${window.formatMoney(window.parseMoney(document.getElementById('materiality').value))}円
+許容誤謬: ${window.formatMoney(window.parseMoney(document.getElementById('tolerableMisstatement').value))}円
+期待誤謬: ${window.formatMoney(window.parseMoney(document.getElementById('expectedMisstatement').value))}円
+`;
+    } else {
+      content += `【PL項目詳細】
+母集団取引件数: ${window.formatInteger(window.parseNumber(document.getElementById('plTransactionCount').value))}件
+母集団金額: ${window.formatMoney(window.parseMoney(document.getElementById('plTotalAmount').value))}円
+PL重要性基準: ${window.formatMoney(window.parseMoney(document.getElementById('plMateriality').value))}円
+信頼度: ${document.getElementById('plConfidenceLevel')?.options[document.getElementById('plConfidenceLevel')?.selectedIndex]?.text || ''}
+重点監査要点: ${document.getElementById('plAssertionType').options[document.getElementById('plAssertionType').selectedIndex].text}
+`;
+    }
+
+    content += `
+========================================
+【サンプリング実施結果】
+========================================
+実施サンプル数: ${ppsSampleCount}件
+発見誤謬数: ${ppsErrorCount}件
+
+【個別サンプル検証結果】
+No. | サンプルID | 簿価 | 監査後価値 | 差異 | 備考
+----|------------|------|------------|------|------
+1   |            |      |            |      |
+2   |            |      |            |      |
+3   |            |      |            |      |
+（詳細は別紙参照）
+
+========================================
+【誤謬評価】
+========================================
+◆ 定量的評価
+評価結果: ${ppsEvalResult}
+
+◆ 定性的評価
+誤謬の性質: ${errorNature}
+発生原因: 
+${errorCause}
+
+他領域への影響:
+${otherImpact}
+
+経営者の対応:
+${managementResponse}
+
+========================================
+【監査上の結論】
+========================================
+[  ] 検証結果は良好 - 追加手続き不要
+[  ] 条件付き良好 - 限定的な追加手続きを実施
+[  ] 要改善 - 追加手続きが必要
+[  ] 重要な虚偽表示の可能性 - 修正を要請
+
+【結論の根拠】
+_________________________________________________
+_________________________________________________
+_________________________________________________
+
+【追加手続きの内容（該当する場合）】
+_________________________________________________
+_________________________________________________
+
+========================================
+【品質管理】
+========================================
+作成日: ${date}
+作成者: ________________ （署名）
+査閲日: ________________
+査閲者: ________________ （署名）
+承認日: ________________
+監査責任者: ________________ （署名）
+
+【査閲コメント】
+_________________________________________________
+_________________________________________________
+
+========================================`;
+
+    downloadTextFile(content, `実証手続調書_${accountType.toUpperCase()}_${company}_${new Date().toISOString().split('T')[0]}.txt`);
+    updateStatus('詳細な監査調書を出力しました');
+  };
+
+  function downloadTextFile(content, filename) {
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function copyToClipboard(text, successMessage) {
+    navigator.clipboard.writeText(text).then(() => {
+      updateStatus(successMessage);
+    }).catch(() => {
+      // フォールバック: 古いブラウザ対応
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.left = '-9999px';
+      document.body.appendChild(textarea);
+      textarea.select();
+      
+      try {
+        document.execCommand('copy');
+        updateStatus(successMessage);
+      } catch (error) {
+        showError('コピーに失敗しました');
+      } finally {
+        document.body.removeChild(textarea);
+      }
+    });
+  }
+
+  // 初期化
+  function initialize() {
+    try {
+      // 金額入力フィールドの初期化
+      document.querySelectorAll('.money-input').forEach(input => {
+        window.formatMoneyInput(input);
+      });
+      
+      // 数値入力フィールドの初期化
+      const plTransCount = document.getElementById('plTransactionCount');
+      if (plTransCount) {
+        window.formatNumberInput(plTransCount);
+      }
+      
+      const populationSize = document.getElementById('populationSize');
+      if (populationSize) {
+        window.formatNumberInput(populationSize);
+      }
+      
+      const bsPopulationCount = document.getElementById('bsPopulationCount');
+      if (bsPopulationCount) {
+        window.formatNumberInput(bsPopulationCount);
+      }
+      
+      // 初期計算
+      calculateAuditRiskModel();
+      window.calculateAttributeSampling();
+      window.toggleAccountType();
+      
+      // 特定項目の初期設定
+      if (window.updateSpecificItems) {
+        window.updateSpecificItems();
+      }
+      
+      // 保存されたズーム設定を復元
+      const savedZoom = localStorage.getItem('auditToolZoom');
+      if (savedZoom) {
+        currentZoom = parseInt(savedZoom);
+        applyZoom();
+      }
+      
+      updateStatus('システム準備完了');
+    } catch (error) {
+      showError('初期化エラー: ' + error.message);
+      updateStatus('初期化エラー', true);
+    }
+  }
+
+  // イベントリスナー設定
+  ['ar', 'ir', 'cr', 'confidenceLevel'].forEach(id => {
+    const element = document.getElementById(id);
+    if (element) {
+      element.addEventListener('change', () => {
+        calculateAuditRiskModel();
+        window.recalculateSubstantive();
+      });
+    }
+  });
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initialize);
+  } else {
+    initialize();
+  }
+})();
+</script>
+</body>
+</html>
