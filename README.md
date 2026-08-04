@@ -15,6 +15,7 @@ AIやデータ分析は、母集団全体へ同じルールを適用し、例外
 
 ## 主な機能
 
+- 計算ページと解説ページを分離したワークスペース切替
 - 監査アプローチの比較（全件分析、特定項目抽出、統計的・非統計的サンプリング、組合せ）
 - AI・データ分析で全件分析しやすいかを考えるチェック
 - AI時代の監査手続フローと全件分析の限界整理
@@ -161,6 +162,8 @@ node tests/calculation-regression.test.cjs
 - `education.css`: 現行IC STUDIOデザインを継承した追加スタイル
 - `compact-ui.js`: 入力カードの整理と現在値に連動する算定ロジック解説
 - `compact-ui.css`: コンパクトUIと算定順序表示のレスポンシブスタイル
+- `workspace-pages.js`: 計算・解説ページの切替と誤謬評価の独立ステップ化
+- `workspace-pages.css`: ページ切替、3ステップ計算フロー、モバイル切替のスタイル
 - `tests/calculation-regression.test.cjs`: 計算結果の回帰テスト
 
 ## 関連ツール
