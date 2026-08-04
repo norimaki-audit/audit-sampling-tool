@@ -21,6 +21,7 @@ AIやデータ分析は、母集団全体へ同じルールを適用し、例外
 - 監査リスクモデル（AR・IR・CR）の計算
 - 統制テストのサンプル数設計
 - 入力条件から生成する「なぜこの件数になったのか」の説明
+- 現在値に連動する「条件 → 基準表 → 母集団上限 → 必要件数」の算定順序
 - 入力条件変更前後の比較と感度分析
 - BS項目のPPS/MUSサンプリング
 - PL項目の実証サンプリング
@@ -158,6 +159,8 @@ node tests/calculation-regression.test.cjs
 - `education-bindings.js`: 既存計算と教育UIの連動
 - `compatibility-fixes.js`: 既存参考表と追加コントロールの表示整合
 - `education.css`: 現行IC STUDIOデザインを継承した追加スタイル
+- `compact-ui.js`: 入力カードの整理と現在値に連動する算定ロジック解説
+- `compact-ui.css`: コンパクトUIと算定順序表示のレスポンシブスタイル
 - `tests/calculation-regression.test.cjs`: 計算結果の回帰テスト
 
 ## 関連ツール
