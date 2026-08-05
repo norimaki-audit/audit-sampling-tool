@@ -1,0 +1,9 @@
+{
+  "name": "audit-sampling-tool",
+  "version": "3.0.0",
+  "private": true,
+  "description": "監査サンプリング設計ツール（統制テスト／BS・PL実証手続）。ランタイム依存なし・ローカル完結。",
+  "scripts": {
+    "test": "node --test \"tests/**/*.test.cjs\""
+  }
+}
