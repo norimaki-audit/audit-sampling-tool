@@ -142,9 +142,10 @@
     show('panel-monetary', type !== 'control');
     show('eval-control', type === 'control');
     show('eval-monetary', type !== 'control');
-    // ROO は統制テストでのみ使う。実証手続では隠して迷わせない。
     show('roo-group', type === 'control');
     show('rooCell', type === 'control');
+    show('ria-group', type !== 'control');
+    show('riaCell', type !== 'control');
     setText('testTypeLabel', {
       control: '統制テスト（属性サンプリング）',
       bs: 'BS項目（金額単位サンプリング）',
@@ -159,6 +160,7 @@
       AR: readNum('ar'),
       IR: readNum('ir'),
       CR: readNum('cr'),
+      RIA: Number(readStr('ria')) || 0.10,
       ROO: Number(readStr('roo')) || 0.10
     });
     state.risk = result;
@@ -168,7 +170,7 @@
     setText('rooValue', pctText(result.ROO, 0));
 
     const drCell = $('drCell');
-    if (drCell) drCell.className = 'result-cell' + (result.clamped ? ' is-bad' : '');
+    if (drCell) drCell.className = 'result-cell';
 
     renderMeta('risk', result);
     return result;
@@ -238,24 +240,22 @@
       populationSize: readNum('populationSize'),
       expectedDeviations: readNum('expectedDeviations'),
       tolerableRate: Number(readStr('tolerableRate')) || 0.09,
-      ROO: risk.ROO
+      ROO: risk.ROO,
+      samplingApproach: readStr('samplingApproach') || 'statistical'
     });
     state.attribute = result;
 
     setText('ctrlSampleSize', intText(result.sampleSize) + '件');
     setText('ctrlAllowable', intText(result.allowableDeviations) + '件');
     setText('ctrlAdditional', result.additionalSamples === null ? 'N/A' : intText(result.additionalSamples) + '件');
-    setText('ctrlMethod', result.statistical ? '統計的サンプリング' : '非統計的（実務慣行）');
+    setText('ctrlMethod', result.statistical ? '統計的（正確二項）' : '非統計的（参考値）');
 
     const methodCell = $('ctrlMethodCell');
-    if (methodCell) methodCell.className = 'result-cell' + (result.statistical ? '' : ' is-bad');
+    if (methodCell) methodCell.className = 'result-cell' + (result.statistical ? '' : ' is-caution');
 
     renderMeta('ctrl', result);
-
-    // 評価側のサンプル数を既定値として同期
     const evalField = $('attrSampleSize');
     if (evalField && !evalField.dataset.touched) evalField.value = result.sampleSize;
-
     return result;
   }
 
@@ -263,6 +263,7 @@
     const risk = state.risk || recalcRisk();
     const type = currentTestType();
     const specific = state.specific || recalcSpecific();
+    const completeness = readStr('assertion') === '網羅性';
 
     const result = E.calculateMonetarySampling({
       BV: specific.residualAmount,
@@ -270,37 +271,31 @@
       EM: readNum('expectedMisstatement'),
       RIA: risk.RIA,
       accountType: type,
-      assertion: readStr('mvAssertion'),
-      method: readStr('mvMethod'),
+      assertion: completeness ? 'completeness' : 'occurrence',
+      method: 'systematic',
       transactionCount: specific.residualCount,
       highValueTotal: $('highValueTotal') && $('highValueTotal').value !== ''
         ? readNum('highValueTotal') : null
     });
     state.monetary = result;
 
-    setText('mvSampleSize', result.valid ? intText(result.sampleSize) + '件' : '—');
+    setText('mvSampleSize', result.valid ? intText(result.sampleSize) + 'ポイント' : '—');
     setText('mvInterval', result.valid ? moneyYen(result.samplingInterval) : '—');
-    setText('mvCoverage', result.valid && result.coverage !== null ? pctText(result.coverage, 1) : '算定不能');
+    setText('mvCoverage', result.valid && result.coverage !== null ? pctText(result.coverage, 1) : '未算定');
     setText('mvCF', result.valid ? result.CF.toFixed(2) : '—');
-    setText('mvFloor', result.valid && result.riskBand
-      ? `${result.riskBand.label}（${result.riskBand.floor}件）` : 'N/A');
-
-    show('mvFloorCell', type === 'pl');
-    show('mvPlOptions', type === 'pl');
+    setText('mvEF', result.valid ? result.EF.toFixed(2) : '—');
 
     const coverageCell = $('mvCoverageCell');
     if (coverageCell) {
-      coverageCell.className = 'result-cell' + (result.valid && result.coverage === null ? '' : ' is-primary');
+      coverageCell.className = 'result-cell' + (result.valid && result.coverage !== null ? ' is-primary' : '');
       coverageCell.title = result.coverageBasis || '';
     }
 
     renderMeta('mv', result);
-
     const evalField = $('ppsInterval');
     if (evalField && !evalField.dataset.touched && result.valid) {
       evalField.value = E.format.group(Math.round(result.samplingInterval));
     }
-
     return result;
   }
 
@@ -308,11 +303,13 @@
 
   function evaluateControl() {
     const risk = state.risk || recalcRisk();
+    const design = state.attribute || recalcControl();
     const result = E.evaluateAttributeResults({
       sampleSize: readNum('attrSampleSize'),
       deviations: readNum('attrDeviations'),
       tolerableRate: Number(readStr('tolerableRate')) || 0.09,
-      ROO: risk.ROO
+      ROO: risk.ROO,
+      statistical: design.statistical
     });
     state.attributeEval = result;
 
@@ -321,11 +318,13 @@
     setText('attrEvalResult', result.evaluation);
     setText('attrAction', result.requiredAction);
 
-    // ULD と判定が常に一貫するため、色も ULD だけから決まる
+    let tone = '';
+    if (result.effective === true) tone = ' is-good';
+    if (result.effective === false) tone = ' is-bad';
     const cell = $('attrEvalCell');
-    if (cell) cell.className = 'result-cell ' + (result.effective ? 'is-good' : 'is-bad');
+    if (cell) cell.className = 'result-cell' + tone;
     const uldCell = $('attrUldCell');
-    if (uldCell) uldCell.className = 'result-cell ' + (result.effective ? 'is-good' : 'is-bad');
+    if (uldCell) uldCell.className = 'result-cell' + tone;
 
     renderMeta('attrEval', result);
     return result;
@@ -382,7 +381,7 @@
     const noneFound = $('noMisstatementFound') && $('noMisstatementFound').checked;
 
     // 誤謬明細が未入力で「誤謬なし」の確認もされていない状態は「未評価」とする。
-    // ここで評価すると、手続を実施していないのに緑の「受入可能」が出てしまう
+    // ここで評価すると、手続未実施でも統計的上限の比較結果が表示されてしまう
     // （期待誤謬0の設計では 基本精度 = 許容誤謬 となり UML ≦ TM が成立するため）。
     if (rows.length === 0 && !noneFound) {
       state.monetaryEval = null;
@@ -426,7 +425,7 @@
     setText('ppsIncremental', moneyYen(over.incrementalAllowance));
     setText('ppsUpperLimit', moneyYen(over.upperMisstatementLimit));
     setText('ppsUnderLimit', result.understatement.count > 0
-      ? moneyYen(result.understatement.upperMisstatementLimit)
+      ? moneyYen(result.understatement.knownMisstatement)
       : '該当なし');
     setText('ppsEvalResult', result.evaluation || '—');
 
@@ -498,6 +497,7 @@
     const push = (label, value) => lines.push(label + '\t' + value);
 
     lines.push('監査サンプリング調書 v3.0');
+    lines.push('【重要な免責】個人開発の非公式ツールによる計画・検討用の出力です。監査基準、所属法人等のメソドロジー、職業的専門家としての判断、十分かつ適切な監査証拠又は正式な監査調書を代替しません。計算と入力値は利用者が再検証してください。');
     lines.push('');
     push('対象会社', readStr('company') || '—');
     push('会計年度', readStr('fiscalYear') || '—');
@@ -512,11 +512,11 @@
       push('固有リスク IR', String(state.risk.IR));
       push('統制リスク CR', String(state.risk.CR));
       push('発見リスク DR', pctText(state.risk.DR, 1));
-      push('受入リスク RIA', pctText(state.risk.RIA, 1));
-      push('過信リスク ROO', pctText(state.risk.ROO, 0));
+      if (type !== 'control') push('受入リスク RIA（別途設定）', pctText(state.risk.RIA, 1));
+      if (type === 'control') push('過信リスク ROO', pctText(state.risk.ROO, 0));
       push('算式', state.risk.formula.substituted);
-      if (state.risk.clamped) push('注記', state.risk.warnings.join(' / '));
       push('算定根拠', state.risk.basis);
+      state.risk.warnings.forEach((w, i) => push('注意' + (i + 1), w));
       lines.push('');
     }
 
@@ -524,7 +524,7 @@
       lines.push('【③特定項目控除】');
       push('母集団総額', moneyYen(state.specific.populationAmount));
       push('母集団件数', intText(state.specific.populationCount) + '件');
-      push('特定項目閾値', moneyYen(state.specific.threshold));
+      push('利用者設定の特定項目閾値', moneyYen(state.specific.threshold));
       push('特定項目合計額', moneyYen(state.specific.specificAmount));
       push('特定項目件数', intText(state.specific.specificCount) + '件');
       push('残余母集団', moneyYen(state.specific.residualAmount));
@@ -537,10 +537,10 @@
       push('統制頻度', a.frequencyLabel);
       push('母集団件数', intText(a.populationSize) + '件');
       push('許容逸脱率', pctText(a.tolerableRate, 0));
-      push('予想逸脱件数', intText(a.expectedDeviations) + '件');
+      push('計画上の予想逸脱件数', intText(a.expectedDeviations) + '件');
       push('必要サンプル数', intText(a.sampleSize) + '件');
-      push('追加サンプル数', a.additionalSamples === null ? 'N/A' : intText(a.additionalSamples) + '件');
-      push('サンプリング区分', a.statistical ? '統計的サンプリング' : '非統計的（実務慣行）');
+      push('予想逸脱+1件時の増分', a.additionalSamples === null ? 'N/A' : intText(a.additionalSamples) + '件');
+      push('サンプリング区分', a.statistical ? '統計的（正確二項）' : '非統計的（参考頻度別ルール・要確認）');
       push('算式', a.formula.substituted);
       push('算定根拠', a.basis);
       a.warnings.forEach((w, i) => push('警告' + (i + 1), w));
@@ -549,11 +549,11 @@
       push('母集団簿価 BV', moneyYen(m.BV));
       push('許容誤謬 TM', moneyYen(m.TM));
       push('期待誤謬 EM', moneyYen(m.EM));
-      push('拡大係数 EF', String(m.EF));
+      push('拡大係数 EF（RIA対応）', m.EF.toFixed(2));
       push('信頼係数 CF', m.CF.toFixed(2));
-      push('必要サンプル数', intText(m.sampleSize) + '件');
+      push('選択ポイント数', intText(m.sampleSize) + 'ポイント');
       push('サンプリング間隔 SI', moneyYen(m.samplingInterval));
-      push('カバレッジ率', m.coverage === null ? '算定不能（' + m.coverageBasis + '）' : pctText(m.coverage, 1));
+      push('確実抽出項目比率', m.coverage === null ? '未算定（' + m.coverageBasis + '）' : pctText(m.coverage, 1));
       push('算式', m.formula.substituted);
       push('算定根拠', m.basis);
       m.warnings.forEach((w, i) => push('警告' + (i + 1), w));
@@ -570,10 +570,11 @@
       push('標本逸脱率', pctText(ev.deviationRate));
       push('上限逸脱率 ULD', pctText(ev.upperDeviationLimit));
       push('許容逸脱率', pctText(ev.tolerableRate, 0));
-      push('評価結果', ev.evaluation);
+      push('統計的結果／判断', ev.evaluation);
       push('必要な対応', ev.requiredAction);
       push('算式', ev.formula.substituted);
       push('算定根拠', ev.basis);
+      ev.warnings.forEach((w, i) => push('警告' + (i + 1), w));
     } else if (state.monetaryEval && state.monetaryEval.valid) {
       const ev = state.monetaryEval;
       push('サンプリング間隔 SI', moneyYen(ev.SI));
@@ -581,10 +582,10 @@
       push('推定誤謬額（過大）', moneyYen(ev.overstatement.projectedMisstatement));
       push('増分許容誤謬（過大）', moneyYen(ev.overstatement.incrementalAllowance));
       push('推定誤謬上限 UML（過大）', moneyYen(ev.overstatement.upperMisstatementLimit));
-      push('推定誤謬上限 UML（過小）', ev.understatement.count > 0
-        ? moneyYen(ev.understatement.upperMisstatementLimit) : '該当なし');
+      push('既知の過小計上額（別途評価）', ev.understatement.count > 0
+        ? moneyYen(ev.understatement.knownMisstatement) : '該当なし');
       push('許容誤謬', moneyYen(ev.tolerableMisstatement));
-      push('評価結果', ev.evaluation || '—');
+      push('統計的結果', ev.evaluation || '—');
       push('算式', ev.formula.substituted);
       push('算定根拠', ev.basis);
       ev.warnings.forEach((w, i) => push('警告' + (i + 1), w));
@@ -593,6 +594,7 @@
     }
 
     lines.push('');
+    lines.push('【利用上の確認】本出力だけで監査結論を形成しないでください。母集団の適合性・完全性、抽出の実施、例外や誤謬の性質・原因、定性的影響及び他の監査証拠をあわせて評価し、所属法人等の承認手続に従ってください。');
     lines.push('作成日時\t' + new Date().toLocaleString('ja-JP'));
     return lines.join('\n');
   }

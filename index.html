@@ -7,6 +7,7 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='2' fill='%230F6B62'/%3E%3Cpath d='M6 7h12M6 12h12M6 17h7' stroke='white' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="./styles.css">
 <link rel="stylesheet" href="./selection-guide.css">
+<link rel="stylesheet" href="./compliance.css">
 </head>
 <body>
 
@@ -31,6 +32,12 @@
     <button type="button" class="mode-tab" id="tab-stats" role="tab" aria-selected="false" aria-controls="panel-stats">統計のきほん</button>
     <button type="button" class="mode-tab" id="tab-theory" role="tab" aria-selected="false" aria-controls="panel-theory">理論編</button>
     <button type="button" class="mode-tab" id="tab-ai" role="tab" aria-selected="false" aria-controls="panel-ai">AIとサンプリング</button>
+  </div>
+
+  <div class="disclaimer-banner" role="note">
+    <strong>個人開発の非公式ツールです。</strong>
+    計画・学習の補助として利用し、計算結果は監査基準、所属法人等のメソドロジー及び職業的専門家としての判断に照らして再検証してください。
+    <a href="#disclaimer">免責・利用条件</a>
   </div>
 
   <!-- ==================================================================== -->
@@ -93,54 +100,57 @@
       <div class="step-head">
         <span class="step-num">2</span>
         <h2>リスク評価</h2>
-        <span class="step-sub">RIA は実証手続へ、ROO は統制テストへ流れます</span>
+        <span class="step-sub">DRを確認し、RIA・ROOは手続別に設定します</span>
       </div>
       <div class="step-body">
         <div class="grid two">
           <div class="form-group">
             <label class="form-label" for="ar">目標監査リスク AR</label>
             <input id="ar" type="number" class="form-input" step="0.01" min="0.001" max="0.5" value="0.05">
-            <div class="form-description">全体として許容する監査リスク</div>
+            <div class="form-description">監査計画で設定した目標監査リスクを転記します</div>
           </div>
           <div class="form-group">
             <label class="form-label" for="ir">固有リスク IR</label>
             <input id="ir" type="number" class="form-input" step="0.05" min="0.05" max="1" value="1.00">
-            <div class="form-description">
-              <strong>監査計画のリスク評価から転記する値です。</strong>この画面で新たに決める値ではありません。<br>
-              低：0.3 ／ 中：0.5 ／ 高：0.7 ／ 最大：1.0
-            </div>
+            <div class="form-description"><strong>監査計画のリスク評価から転記する値です。</strong>所属法人等の評価尺度に従ってください。</div>
           </div>
           <div class="form-group">
             <label class="form-label" for="cr">統制リスク CR</label>
             <input id="cr" type="number" class="form-input" step="0.05" min="0.05" max="1" value="1.00">
-            <div class="form-description">
-              <strong>監査計画のリスク評価から転記する値です。</strong>1.00 未満とするには統制テストの実施が前提になります。<br>
-              低：0.3 ／ 中：0.5 ／ 高：0.7 ／ 最大：1.0
-            </div>
+            <div class="form-description"><strong>監査計画のリスク評価から転記する値です。</strong>1.00未満とする場合は、関連する統制の運用評価手続による裏付けが必要です。</div>
+          </div>
+          <div class="form-group" id="ria-group" hidden>
+            <label class="form-label" for="ria">受入リスク RIA（金額単位サンプリング）</label>
+            <select id="ria" class="form-input">
+              <option value="0.20">20%（信頼度80%）</option>
+              <option value="0.15">15%（信頼度85%）</option>
+              <option value="0.10" selected>10%（信頼度90%・標準）</option>
+              <option value="0.05">5%（信頼度95%）</option>
+              <option value="0.01">1%（信頼度99%）</option>
+            </select>
+            <div class="form-description">DRから自動変換しません。監査計画と所属法人等のメソドロジーに基づき、サンプリング手続に割り当てる受入リスクを設定します。</div>
           </div>
           <div class="form-group" id="roo-group">
-            <label class="form-label" for="roo">過信リスク ROO（統制に依拠する程度）</label>
+            <label class="form-label" for="roo">過信リスク ROO（統制テスト）</label>
             <select id="roo" class="form-input">
               <option value="0.10">10%（信頼度90%・標準）</option>
               <option value="0.05">5%（信頼度95%・強く依拠する）</option>
             </select>
-            <div class="form-description">
-              統制テストのサンプル数と上限逸脱率を決めます。発見リスクから導出せず独立に設定します。
-            </div>
+            <div class="form-description">統制への依拠の程度と所属法人等のメソドロジーに従って独立に設定します。</div>
           </div>
         </div>
 
         <div class="result-grid">
           <div class="result-cell" id="drCell">
-            <div class="rc-label">発見リスク DR</div>
+            <div class="rc-label">発見リスク DR（参考）</div>
             <div class="rc-value" id="drValue">—</div>
           </div>
-          <div class="result-cell is-primary">
-            <div class="rc-label">受入リスク RIA（実証手続）</div>
+          <div class="result-cell is-primary" id="riaCell" hidden>
+            <div class="rc-label">設定した受入リスク RIA</div>
             <div class="rc-value" id="riaValue">—</div>
           </div>
           <div class="result-cell is-primary" id="rooCell">
-            <div class="rc-label">過信リスク ROO（統制テスト）</div>
+            <div class="rc-label">設定した過信リスク ROO</div>
             <div class="rc-value" id="rooValue">—</div>
           </div>
         </div>
@@ -188,15 +198,15 @@
             <label class="form-label" for="tolerableMisstatement">許容誤謬 TM</label>
             <input id="tolerableMisstatement" type="text" class="form-input money-input" value="15,000,000" inputmode="numeric">
             <div class="form-description">
-              円。監査計画で決定済みの<strong>「手続実施上の重要性」を転記します</strong>。ツールが決める値ではありません。
-              全体としての重要性の基準値とは別の金額なので、取り違えにご注意ください。
+              円。<strong>手続実施上の重要性以下で、当該母集団のサンプリング手続に設定した許容誤謬</strong>を転記します。
+              手続実施上の重要性と同額の場合も、それより低い場合もあります。監査計画と所属法人等のメソドロジーを確認してください。
             </div>
           </div>
           <div class="form-group">
             <label class="form-label" for="specificThresholdPercent">特定項目の抽出閾値</label>
             <input id="specificThresholdPercent" type="number" class="form-input" step="5" min="10" max="200" value="75">
             <div class="form-description">
-              許容誤謬に対する百分率（％）。<strong>閾値はこの1系統のみ</strong>です。
+              許容誤謬に対する百分率（％）。75%はツールの初期値であり、監基報530が要求する固定値ではありません。監査目的と所属法人等のメソドロジーに従って設定してください。
             </div>
           </div>
           <div class="form-group">
@@ -247,6 +257,14 @@
         <div id="panel-control">
           <div class="grid two">
             <div class="form-group">
+              <label class="form-label" for="samplingApproach">サンプリング区分</label>
+              <select id="samplingApproach" class="form-input">
+                <option value="statistical">統計的（正確二項）</option>
+                <option value="nonstatistical">非統計的（参考頻度別ルール・要確認）</option>
+              </select>
+              <div class="form-description">母集団件数や頻度だけで自動判定しません。採用する監査アプローチを明示してください。</div>
+            </div>
+            <div class="form-group">
               <label class="form-label" for="controlFrequency">統制の頻度</label>
               <select id="controlFrequency" class="form-input">
                 <option value="daily">日次・随時</option>
@@ -259,7 +277,7 @@
             <div class="form-group">
               <label class="form-label" for="populationSize">母集団件数</label>
               <input id="populationSize" type="text" class="form-input money-input" value="10,000" inputmode="numeric">
-              <div class="form-description">250件未満かつ日次以外は頻度別ルール（非統計的）になります</div>
+              <div class="form-description">当該統制が実施される機会の総数</div>
             </div>
             <div class="form-group">
               <label class="form-label" for="tolerableRate">許容逸脱率 TDR</label>
@@ -270,8 +288,9 @@
               </select>
             </div>
             <div class="form-group">
-              <label class="form-label" for="expectedDeviations">予想逸脱件数</label>
+              <label class="form-label" for="expectedDeviations">計画上の予想逸脱件数</label>
               <input id="expectedDeviations" type="number" class="form-input" min="0" max="10" step="1" value="0">
+              <div class="form-description">過年度結果や予備的なテスト等を踏まえて設定します</div>
             </div>
           </div>
 
@@ -281,11 +300,11 @@
               <div class="rc-value" id="ctrlSampleSize">—</div>
             </div>
             <div class="result-cell">
-              <div class="rc-label">許容逸脱件数</div>
+              <div class="rc-label">計画上の予想逸脱件数</div>
               <div class="rc-value" id="ctrlAllowable">—</div>
             </div>
             <div class="result-cell">
-              <div class="rc-label">逸脱1件増あたり追加</div>
+              <div class="rc-label">予想逸脱+1件時の増分</div>
               <div class="rc-value" id="ctrlAdditional">—</div>
             </div>
             <div class="result-cell" id="ctrlMethodCell">
@@ -300,45 +319,24 @@
         </div>
 
         <!-- BS / PL 共通（金額単位サンプリング） -->
+
         <div id="panel-monetary" hidden>
           <div class="grid two">
             <div class="form-group">
               <label class="form-label" for="expectedMisstatement">期待誤謬 EM</label>
               <input id="expectedMisstatement" type="text" class="form-input money-input" value="0" inputmode="numeric">
-              <div class="form-description">円。分母から EM×拡大係数1.6 を控除します（分子には掛けません）</div>
+              <div class="form-description">円。過年度実績や予備的なテスト等を踏まえて設定します。選択したRIAに対応する拡大係数を用いて取り置きます。</div>
             </div>
             <div class="form-group">
-              <label class="form-label" for="highValueTotal">SI以上の高額項目 合計額（カバレッジ表示用・任意）</label>
-              <input id="highValueTotal" type="text" class="form-input money-input" placeholder="未入力ならカバレッジは算定不能" inputmode="numeric">
-              <div class="form-description">
-                円。<strong>まず空欄のまま算定し</strong>、下に出るサンプリング間隔 SI を基準に、
-                明細から SI 以上の項目を抜き出して合計し、ここへ戻って入力します。
-                ③の「特定項目」とは別の集計です（③は許容誤謬が基準、こちらは SI が基準）。
-                この欄はカバレッジ率の表示にのみ使い、サンプル数は変わりません。
-              </div>
-            </div>
-          </div>
-
-          <div class="grid two" id="mvPlOptions" hidden>
-            <div class="form-group">
-              <label class="form-label" for="mvAssertion">監査要点による調整</label>
-              <select id="mvAssertion" class="form-input">
-                <option value="occurrence">実在性・発生（調整なし）</option>
-                <option value="completeness">網羅性（×1.5）</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="mvMethod">サンプリング手法</label>
-              <select id="mvMethod" class="form-input">
-                <option value="systematic">系統的抽出（調整なし）</option>
-                <option value="stratified">階層化（×0.85）</option>
-              </select>
+              <label class="form-label" for="highValueTotal">SI以上の確実抽出項目 合計額（任意）</label>
+              <input id="highValueTotal" type="text" class="form-input money-input" placeholder="未入力なら比率は未算定" inputmode="numeric">
+              <div class="form-description">円。まず空欄でSIを算定し、SI以上の項目を明細から集計して入力します。この金額は確実抽出項目比率の表示だけに使い、サンプル数を変更しません。</div>
             </div>
           </div>
 
           <div class="result-grid">
             <div class="result-cell is-primary">
-              <div class="rc-label">必要サンプル数</div>
+              <div class="rc-label">選択ポイント数</div>
               <div class="rc-value" id="mvSampleSize">—</div>
             </div>
             <div class="result-cell">
@@ -346,16 +344,16 @@
               <div class="rc-value" id="mvInterval" style="font-size:17px">—</div>
             </div>
             <div class="result-cell" id="mvCoverageCell">
-              <div class="rc-label">カバレッジ率</div>
+              <div class="rc-label">確実抽出項目比率</div>
               <div class="rc-value" id="mvCoverage" style="font-size:17px">—</div>
             </div>
             <div class="result-cell">
-              <div class="rc-label">信頼係数 CF = −ln(RIA)</div>
+              <div class="rc-label">信頼係数 CF</div>
               <div class="rc-value" id="mvCF">—</div>
             </div>
-            <div class="result-cell" id="mvFloorCell" hidden>
-              <div class="rc-label">最低件数フロア（RIA由来）</div>
-              <div class="rc-value" id="mvFloor" style="font-size:17px">—</div>
+            <div class="result-cell">
+              <div class="rc-label">拡大係数 EF（RIA対応）</div>
+              <div class="rc-value" id="mvEF">—</div>
             </div>
           </div>
 
@@ -363,6 +361,7 @@
           <ul class="warning-list" id="mvWarnings"></ul>
           <p class="basis-line" id="mvBasis"></p>
         </div>
+
       </div>
     </section>
 
@@ -371,7 +370,7 @@
       <div class="step-head">
         <span class="step-num">5</span>
         <h2>誤謬評価</h2>
-        <span class="step-sub">上限値と判定は常に一致します</span>
+        <span class="step-sub">統計的な数値結果に、定性的な評価を重ねます</span>
       </div>
       <div class="step-body">
 
@@ -423,7 +422,7 @@
           <div class="form-description" style="margin-bottom:10px">
             <strong>簿価</strong>＝抽出した項目の帳簿計上額（全額）です。差額や誤謬額ではありません。／
             <strong>監査後価値</strong>＝監査人が正しいと判断した金額（残高確認の回答額、証憑上の金額など）です。／
-            差額は自動計算され、簿価が大きければ過大計上、監査後価値が大きければ過小計上として別々に集計します。
+            差額は自動計算されます。過大計上はMUSで投影し、過小計上は既知額として別表示します。MUSは未計上項目の完全性を統計的に裏付けないため、過小計上・未計上には別の手続が必要です。
           </div>
           <div class="row-head">
             <div>簿価</div><div>監査後価値</div><div>差額</div><div></div>
@@ -456,7 +455,7 @@
               <div class="rc-value" id="ppsUpperLimit" style="font-size:17px">—</div>
             </div>
             <div class="result-cell" id="ppsUnderCell">
-              <div class="rc-label">推定誤謬上限 UML（過小）</div>
+              <div class="rc-label">既知の過小計上額（別途評価）</div>
               <div class="rc-value" id="ppsUnderLimit" style="font-size:17px">—</div>
             </div>
             <div class="result-cell" id="ppsEvalCell">
@@ -481,7 +480,7 @@
       </div>
       <div class="step-body">
         <div class="alert info" style="margin-bottom:16px">
-          調書には算式・算定根拠・警告がそのまま含まれます。上限値と判定が矛盾した組み合わせは出力されません。
+          出力は計画・検討用のドラフトです。算式・算定根拠・警告・免責を含みますが、これだけでは十分な監査証拠又は正式な監査調書になりません。
         </div>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
           <button type="button" class="btn btn-primary" id="copyWorksheet">クリップボードにコピー</button>
@@ -892,7 +891,7 @@ n = 25:  0.91 を25回掛ける =  9.5%   → 10%以下になった ✓</div>
               <tr><td class="t-abbr">IR</td><td class="t-en">Inherent Risk</td><td>固有リスク</td><td>統制を考慮しない段階での虚偽表示の起きやすさ</td></tr>
               <tr><td class="t-abbr">CR</td><td class="t-en">Control Risk</td><td>統制リスク</td><td>虚偽表示が生じたとき、統制がそれを防止・発見できない割合</td></tr>
               <tr><td class="t-abbr">DR</td><td class="t-en">Detection Risk</td><td>発見リスク</td><td>AR ÷ (IR × CR)。監査人に残された見逃しの余地</td></tr>
-              <tr><td class="t-abbr">RIA</td><td class="t-en">Risk of Incorrect Acceptance</td><td>受入リスク</td><td>実証手続で誤って「問題なし」と受け入れる確率。DRを1〜20%に収めた値</td></tr>
+              <tr><td class="t-abbr">RIA</td><td class="t-en">Risk of Incorrect Acceptance</td><td>受入リスク</td><td>MUSで誤って母集団を受け入れるリスク。DRとは区別し、監査計画に基づいて設定する</td></tr>
               <tr><td class="t-abbr">ROO</td><td class="t-en">Risk of Over-reliance</td><td>過信リスク</td><td>統制テストで、有効でない統制を有効と誤信する確率。5%か10%を直接選ぶ</td></tr>
             </tbody>
           </table>
@@ -911,7 +910,7 @@ n = 25:  0.91 を25回掛ける =  9.5%   → 10%以下になった ✓</div>
         </div>
         <p>
           この3つは統計から出てくる数字ではありません。<strong>監査人の職業的判断で置く値</strong>です。
-          ①のうち AR・IR・CR・ROO も同じく判断で置きます。計算で決まるのは DR・RIA と、以下の③④だけです。
+          ①のうちAR・IR・CR・RIA・ROOも同じく判断で置きます。計算で求めるDRは、RIAやROOを自動的に決める値ではありません。
         </p>
 
         <h4>③ 何をどれだけ見るか</h4>
@@ -923,7 +922,7 @@ n = 25:  0.91 を25回掛ける =  9.5%   → 10%以下になった ✓</div>
               <tr><td class="t-abbr">PPS</td><td class="t-en">Probability-Proportional-to-Size</td><td>金額比例確率抽出</td><td>MUSの別名。金額が大きい項目ほど当たりやすい</td></tr>
               <tr><td class="t-abbr">BV</td><td class="t-en">Book Value</td><td>母集団簿価</td><td>検証対象の帳簿残高合計（円）</td></tr>
               <tr><td class="t-abbr">CF</td><td class="t-en">Confidence Factor</td><td>信頼係数</td><td>CF(0) = −ln(RIA)。求める確信の強さを表す無次元の倍率</td></tr>
-              <tr><td class="t-abbr">EF</td><td class="t-en">Expansion Factor</td><td>拡大係数</td><td>1.6固定。期待誤謬の見積り自体が外れる分の割増（慣行値）</td></tr>
+              <tr><td class="t-abbr">EF</td><td class="t-en">Expansion Factor</td><td>拡大係数</td><td>期待誤謬の不確実性を取り置く、RIAに対応した表の係数</td></tr>
               <tr><td class="t-abbr">SI</td><td class="t-en">Sampling Interval</td><td>サンプリング間隔</td><td>何円ごとに1件当てるか（円）</td></tr>
             </tbody>
           </table>
@@ -944,7 +943,7 @@ n = 25:  0.91 を25回掛ける =  9.5%   → 10%以下になった ✓</div>
         <div class="misread">
           <div class="misread-item">
             <span class="mi-tag mi-x">RIA / ROO</span>
-            <div>どちらも「大丈夫と誤る確率」ですが、<strong>行き先が違います</strong>。RIA は DR から計算されて実証手続へ、ROO は独立に選んで統制テストへ流れます。AR・IR・CR を動かしても ROO は動きません。</div>
+            <div>どちらも「大丈夫と誤る確率」ですが、<strong>行き先が違います</strong>。RIAはMUS、ROOは統制テストに使います。どちらもDRから機械的に導出せず、監査計画と所属法人等のメソドロジーに従って設定します。</div>
           </div>
           <div class="misread-item">
             <span class="mi-tag mi-x">TM / EM</span>
@@ -1007,25 +1006,29 @@ n = 25:  0.91 を25回掛ける =  9.5%   → 10%以下になった ✓</div>
         </p>
 
         <h4>数値にすると何が見えるか</h4>
-        <p>母集団簿価5億円・許容誤謬1,500万円・AR=5%・期待誤謬0のとき、リスク評価とサンプル数はこう対応します。</p>
+        <p>
+          DRは実証手続全体に残された発見リスクであり、MUSだけの受入リスクRIAと同じではありません。
+          分析的実証手続、詳細テストその他の手続へリスクをどう配分するかを監査計画で検討し、RIAを別途設定します。
+          次は、母集団簿価5億円・許容誤謬1,500万円・期待誤謬0で、RIAだけを変えた場合の例です。
+        </p>
         <div class="qr-scroll">
           <table class="qr-table">
-            <thead><tr><th>IR</th><th>CR</th><th>DR</th><th>RIA</th><th>CF</th><th>サンプル数</th></tr></thead>
+            <thead><tr><th>設定したRIA</th><th>信頼度</th><th>CF</th><th>選択ポイント数</th></tr></thead>
             <tbody>
-              <tr><th>0.3</th><td>0.3</td><td>55.6%</td><td>20.0%<span class="qr-sub">上限で頭打ち</span></td><td>1.61</td><td><strong>54件</strong></td></tr>
-              <tr><th>0.5</th><td>0.5</td><td>20.0%</td><td>20.0%</td><td>1.61</td><td><strong>54件</strong></td></tr>
-              <tr><th>0.7</th><td>0.5</td><td>14.3%</td><td>14.3%</td><td>1.95</td><td><strong>65件</strong></td></tr>
-              <tr><th>0.7</th><td>0.7</td><td>10.2%</td><td>10.2%</td><td>2.28</td><td><strong>77件</strong></td></tr>
-              <tr><th>0.7</th><td>1.0</td><td>7.1%</td><td>7.1%</td><td>2.64</td><td><strong>88件</strong></td></tr>
-              <tr><th>1.0</th><td>1.0</td><td>5.0%</td><td>5.0%</td><td>3.00</td><td><strong>100件</strong></td></tr>
+              <tr><th>20%</th><td>80%</td><td>1.61</td><td><strong>54</strong></td></tr>
+              <tr><th>15%</th><td>85%</td><td>1.90</td><td><strong>64</strong></td></tr>
+              <tr><th>10%</th><td>90%</td><td>2.30</td><td><strong>77</strong></td></tr>
+              <tr><th>5%</th><td>95%</td><td>3.00</td><td><strong>100</strong></td></tr>
+              <tr><th>1%</th><td>99%</td><td>4.61</td><td><strong>154</strong></td></tr>
             </tbody>
           </table>
         </div>
         <p>
-          上2行が同じ54件になっているのは、発見リスクが上限20%で頭打ちになっているからです。
-          IR・CR をいくら低く評価しても、サンプル数はこれ以上は減りません。
-          この頭打ちは黙って適用すると誤解のもとなので、<strong>発動したときは計算画面に明示</strong>しています。
+          RIAを下げるほど、誤って受け入れるリスクを小さくするため選択ポイント数が増えます。
+          どのRIAが適切かは、この表の件数から逆算せず、監査計画と所属法人等のメソドロジーに従って先に決めます。
         </p>
+
+        <h4>覚えておくと使える性質</h4>
 
         <h4>覚えておくと使える性質</h4>
         <p>
@@ -1258,14 +1261,14 @@ n  = BV ÷ SI = BV × CF(0) ÷ (TM − EM × EF)</div>
         </p>
         <div class="theory-formula">基本精度 = CF(0) × SI = CF(0) × (TM − EM×EF) ÷ CF(0) = TM − EM × EF</div>
         <p>
-          つまり基本精度は RIA に依存せず、<strong>許容誤謬から期待誤謬の割増分を引いた額そのもの</strong>です。
-          これは「誤謬が1件も見つからなくても必ず残る、見ていない部分の余白」を表しています。
+          つまり基本精度は<strong>許容誤謬から、RIAに対応するEFで拡大した期待誤謬を引いた額</strong>です。
+          EMが0ならTMと一致しますが、EMがある場合はEFを介してRIAの設定にも影響されます。これは、誤謬が見つからなくても残るサンプリングリスクへの取り置きです。
         </p>
 
         <div class="misread">
           <div class="misread-item">
             <span class="mi-tag mi-x">重要な帰結</span>
-            <div>期待誤謬を <strong>0 と置くと、基本精度は許容誤謬とぴったり一致します</strong>。誤謬に使える余白はゼロです。この設計で誤謬を1円でも発見すると、推定誤謬上限は必ず許容誤謬を超え「受入不可」になります。</div>
+            <div>期待誤謬を <strong>0 と置くと、基本精度は許容誤謬とぴったり一致します</strong>。誤謬に使える余白はゼロです。この設計で過大計上誤謬を発見すると、推定誤謬上限は許容誤謬を超え、監査アプローチの再評価が必要になります。</div>
           </div>
           <div class="misread-item">
             <span class="mi-tag mi-o">対処</span>
@@ -1273,50 +1276,23 @@ n  = BV ÷ SI = BV × CF(0) ÷ (TM − EM × EF)</div>
           </div>
         </div>
 
-        <h4>拡大係数 1.6 はどこから来た数字か</h4>
+        <h4>拡大係数 EF は受入リスクに応じて変わる</h4>
         <p>
-          EF は理論から導かれた定数ではなく、<strong>受入リスクごとに表で与えられる慣行値</strong>です。
-          監査基準報告書530 研究文書第1号 6-4 も、拡張係数を
-          「信頼度に対応する」係数として説明しています（同項の設例は信頼度75%で 1.25）。
+          EFは期待誤謬の不確実性を取り置くため、<strong>受入リスクに対応する表から選ぶ係数</strong>です。
+          監査基準報告書530 研究文書第1号6-4の考え方に合わせ、本ツールは選択したRIAから次の値を使用します。
         </p>
         <div class="theory-formula">受入リスク RIA   1%    5%    10%   15%   20%   25%
-拡大係数 EF      1.90  1.60  1.50  1.40  1.30  1.25
-                       ↑ 本ツールが固定している 1.6 はここ</div>
+拡大係数 EF      1.90  1.60  1.50  1.40  1.30  1.25</div>
         <p>
-          つまり <strong>1.6 は受入リスク5%に対応する値</strong>です。
-          本ツールは仕様により EF を 1.6 に固定しているため、RIA が 5% から離れるほど標準表とずれます。
+          たとえばRIA=10%ならEF=1.50、RIA=5%ならEF=1.60です。表にない値は隣接する値から補間します。
+          固定値1.6をすべてのRIAへ流用しないため、期待誤謬の取り置きと選択ポイント数が設定した受入リスクに連動します。
         </p>
-        <ul>
-          <li><strong>RIA が 5% より小さいとき</strong> — 標準値（1% なら 1.90）より小さい 1.6 を使うことになり、
-            期待誤謬の取り置きが不足します。サンプル数が必要数を下回る方向のずれです。</li>
-          <li><strong>RIA が 5% より大きいとき</strong> — 標準値（10% なら 1.50）より大きい 1.6 を使うため、
-            サンプル数は保守側（多め）になります。</li>
-        </ul>
-        <p>計算画面では、どちら向きにずれているかを警告で表示します。</p>
-        <p>
-          ずれの大きさを見ておきます。母集団簿価5億円・許容誤謬1,500万円・期待誤謬300万円のとき、
-          固定値1.6を使った場合と標準表の値を使った場合を並べます。
-          「余白」は <code>EM × EF</code>、つまり許容誤謬から基本精度を引いた残りで、
-          <strong>発見した誤謬に使える枠</strong>です。
-        </p>
-        <div class="qr-scroll">
-          <table class="qr-table">
-            <thead><tr><th>RIA</th><th>標準EF</th><th>n（固定1.6）</th><th>n（標準EF）</th><th>余白（固定1.6）</th><th>余白（標準EF）</th></tr></thead>
-            <tbody>
-              <tr><th>1%</th><td>1.90</td><td>226件</td><td><strong>248件</strong></td><td>480万円</td><td><strong>570万円</strong></td></tr>
-              <tr><th>5%</th><td>1.60</td><td>147件</td><td>147件</td><td>480万円</td><td>480万円</td></tr>
-              <tr><th>10%</th><td>1.50</td><td>113件</td><td>110件</td><td>480万円</td><td>450万円</td></tr>
-              <tr><th>20%</th><td>1.30</td><td>79件</td><td>73件</td><td>480万円</td><td>390万円</td></tr>
-            </tbody>
-          </table>
+        <div class="theory-intuition">
+          <span class="ti-label">数値の位置付け</span>
+          この表とMUSの式は一つのモデルです。所属法人等が別の信頼係数表、拡大係数又は設計方法を採用している場合は、そちらを優先してください。
         </div>
-        <p>
-          RIA=1% の行が問題です。標準表なら248件抽出し570万円の余白を持つべきところ、
-          固定値1.6では<strong>226件（22件少ない）で余白も480万円（90万円少ない）</strong>になります。
-          サンプル数も余白も足りない方向にずれるため、リスクを絞る設計では
-          期待誤謬を厚めに置くなどの手当てが必要です。
-          RIA が 5% より大きい行では逆に固定値のほうが大きく、サンプル数は保守側に出ます。
-        </p>
+
+        <h4>MUS の2つの前提</h4>
 
         <h4>MUS の2つの前提</h4>
         <ul>
@@ -1849,6 +1825,15 @@ UML          = 基本精度 + Σ推定誤謬 + 増分許容誤謬</div>
     </div>
   </section>
 
+  <details class="global-disclaimer" id="disclaimer">
+    <summary>免責・利用条件</summary>
+    <div>
+      <p>本ツールは個人が開発した非公式の補助ツールであり、日本公認会計士協会（JICPA）、国際監査・保証基準審議会（IAASB）、監査法人その他の団体による提供、承認又は保証を受けたものではありません。</p>
+      <p>教育・計画・検討の支援を目的とし、専門家としての助言、監査意見又は監査結論、監査基準・法令・所属法人等のマニュアル、職業的専門家としての判断、十分かつ適切な監査証拠又は正式な監査調書を代替しません。計算式にはモデル上の仮定があり、実務では所属法人等のメソドロジーを優先してください。</p>
+      <p>正確性、完全性、特定目的への適合性及び常時最新であることを保証しません。利用者は入力値、計算結果、抽出実施及び結論を自ら検証し、法令で許される範囲で利用により生じた損害について開発者は責任を負いません。</p>
+      <p>実在するクライアント情報、個人情報又は機密情報を入力する場合は、所属組織の情報セキュリティ、守秘義務及びデータ取扱方針に従ってください。本ツールはブラウザ内で計算しますが、端末、ブラウザ拡張、画面共有、ダウンロードした調書等の管理は利用者の責任です。</p>
+    </div>
+  </details>
 </main>
 
 <div id="toast" class="error-toast" style="display:none"></div>

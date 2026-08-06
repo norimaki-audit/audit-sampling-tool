@@ -26,13 +26,13 @@
    * 0. 汎用ユーティリティ
    * ========================================================================== */
 
-  const EXPANSION_FACTOR = 1.6;   // 拡大係数 EF（§3.2 により固定。標準表では受入リスク5%に対応）
+  const EXPANSION_FACTOR = 1.6;   // 後方互換用の既定値（RIA=5%）
 
   /*
    * 拡大係数の標準表（受入リスク別）。
    * 監査基準報告書530 研究文書第1号 6-4 は拡張係数が「信頼度に対応する」係数であると述べ、
    * 設例で信頼度75%（リスク25%）→1.25 を示しており、この表と整合する。
-   * 本ツールは仕様により EF を 1.6 に固定するため、この表は警告の判定にのみ用いる。
+   * サンプル設計では選択した RIA に対応する係数を使用する。
    */
   const EXPANSION_FACTOR_TABLE = Object.freeze([
     [0.01, 1.90], [0.05, 1.60], [0.10, 1.50], [0.15, 1.40],
@@ -54,8 +54,8 @@
     return EXPANSION_FACTOR;
   }
   const RIA_MIN = 0.01;
-  const RIA_MAX = 0.20;
-  const PL_ABSOLUTE_CAP = 500;    // PL の絶対上限件数
+  const RIA_MAX = 0.50;
+  const PL_ABSOLUTE_CAP = 500;    // 後方互換用。サンプル数の上限には使用しない
   const MANY_ERRORS_THRESHOLD = 10; // これを超える誤謬件数は前提崩壊として警告
 
   function clamp(value, min, max) {
@@ -247,25 +247,40 @@
     const expectedDeviations = Math.max(0, Math.floor(toFiniteNumber(s.expectedDeviations, 0)));
     const tolerableRate = toFiniteNumber(s.tolerableRate, 0.09);
     const roo = normalizeROO(s.ROO);
-
+    const samplingApproach = s.samplingApproach === 'nonstatistical' ? 'nonstatistical' : 'statistical';
     const warnings = [];
     const tenPercentRule = Math.max(2, Math.ceil(populationSize * 0.1));
 
-    let sampleSize;
-    let basis;
-    let statistical;
+    if (!(populationSize > 0) || !(tolerableRate > 0) || !(tolerableRate < 1)) {
+      return {
+        valid: false,
+        frequency,
+        frequencyLabel: FREQUENCY_LABELS[frequency] || frequency,
+        populationSize,
+        expectedDeviations,
+        tolerableRate,
+        ROO: roo,
+        sampleSize: 0,
+        statistical: samplingApproach === 'statistical',
+        samplingApproach,
+        warnings: ['母集団件数と許容逸脱率を正しく入力してください。'],
+        basis: '入力が不足しているため算定できません。',
+        formula: { expression: 'n = サンプリング設計による', substituted: '—', result: NaN }
+      };
+    }
+
+    let sampleSize = 0;
+    let basis = '';
     let derived = false;
     let additionalSamples = null;
     let formula;
     let exactMinimumSampleSize = null;
+    const statistical = samplingApproach === 'statistical';
 
-    const isTableRoute = frequency === 'daily' || populationSize >= 250;
-
-    if (isTableRoute) {
+    if (statistical) {
       const picked = attributeSampleSizeFromTable(tolerableRate, expectedDeviations, roo);
       sampleSize = picked.sampleSize;
       derived = picked.derived;
-      statistical = true;
 
       if (!Number.isFinite(sampleSize)) {
         warnings.push('許容逸脱率が範囲外のためサンプル数を算定できません。');
@@ -273,17 +288,14 @@
       }
 
       basis = derived
-        ? `正確二項（Clopper–Pearson）から求めた統計的サンプリングです。過信リスク ROO=${pct(roo, 0)}、許容逸脱率 ${pct(tolerableRate, 0)}、予想逸脱 ${expectedDeviations} 件のもとで、上限逸脱率が許容逸脱率以下になる最小のサンプル数です。`
-        : `標準サンプル数表（過信リスク ROO=10%／信頼度90%が前提）による統計的サンプリングです。実務で定着している値のため、一部のセルは正確二項の最小値よりも保守的（サンプル数が多い側）になっています。`;
+        ? `正確二項（Clopper–Pearson）による統計的サンプリングです。過信リスク ROO=${pct(roo, 0)}、許容逸脱率 ${pct(tolerableRate, 0)}、計画上の予想逸脱 ${expectedDeviations} 件のもとで、上限逸脱率が許容逸脱率以下になる最小件数を求めます。`
+        : '標準サンプル数表（過信リスク10%／信頼度90%）による統計的サンプリングです。一部のセルは正確二項の最小値より保守的です。';
 
-      // 追加サンプル数: 逸脱1件を許容できる水準まで引き上げる差分として算出
       const nextLevel = attributeSampleSizeFromTable(tolerableRate, expectedDeviations + 1, roo);
       if (Number.isFinite(nextLevel.sampleSize) && nextLevel.sampleSize > sampleSize) {
         additionalSamples = nextLevel.sampleSize - sampleSize;
       }
 
-      // 慣行表を引いた場合、表の値は正確二項の最小値より大きいことがある。
-      // その場合に「n = min{...}」と表示すると偽の主張になるため、経路ごとに式を分ける。
       if (derived) {
         formula = {
           expression: 'n = min{ n : P(X ≤ x | n, TDR) ≤ ROO }',
@@ -294,49 +306,39 @@
         const exactMinimum = minimumAttributeSampleSize(tolerableRate, expectedDeviations, roo);
         const margin = Number.isFinite(exactMinimum) && exactMinimum < sampleSize
           ? `（正確二項の最小値 ${group(exactMinimum)}件を上回る保守側の慣行値）`
-          : `（正確二項の最小値と一致）`;
+          : '（正確二項の最小値と一致）';
         formula = {
-          expression: 'n = 標準サンプル数表[許容逸脱率, 予想逸脱件数]（ROO=10%）',
+          expression: 'n = 標準サンプル数表[許容逸脱率, 計画上の予想逸脱件数]（ROO=10%）',
           substituted: `n = 標準表[許容逸脱率 ${pct(tolerableRate, 0)}, 予想逸脱 ${expectedDeviations}件] = ${group(sampleSize)}件${margin}`,
           result: sampleSize
         };
-        if (Number.isFinite(exactMinimum) && exactMinimum < sampleSize) {
-          exactMinimumSampleSize = exactMinimum;
-        }
+        if (Number.isFinite(exactMinimum) && exactMinimum < sampleSize) exactMinimumSampleSize = exactMinimum;
       }
     } else {
-      // 母集団 250 件未満の頻度別ルール（日本の実務慣行）
       const frequencyRules = {
-        weekly: { size: Math.min(5, populationSize), label: '週次統制5件' },
-        monthly: { size: Math.max(2, Math.min(3, populationSize)), label: '月次統制2〜3件' },
-        quarterly: { size: Math.min(1, populationSize), label: '四半期統制1件' },
-        annually: { size: Math.min(1, Math.max(1, populationSize)), label: '年次統制1件' }
+        daily: { size: Math.min(25, populationSize), label: '日次・随時25件' },
+        weekly: { size: Math.min(5, populationSize), label: '週次5件' },
+        monthly: { size: Math.max(2, Math.min(3, populationSize)), label: '月次2〜3件' },
+        quarterly: { size: Math.min(1, populationSize), label: '四半期1件' },
+        annually: { size: Math.min(1, populationSize), label: '年次1件' }
       };
       const rule = frequencyRules[frequency];
-
-      if (rule) {
-        sampleSize = rule.size;
-        basis = `頻度別ルール（${rule.label}）です。日本の実務慣行にもとづく非統計的サンプリングのため、正確二項による統計的な裏づけはありません。上限逸脱率は参考値として表示しています。`;
-      } else {
-        sampleSize = Math.min(25, Math.max(2, tenPercentRule));
-        basis = '母集団の10%を使う頻度別ルールです。非統計的サンプリングのため、統計的な裏づけはありません。';
-      }
-      statistical = false;
-      warnings.push('頻度別ルールによる算定です。統計的サンプリングではないため、上限逸脱率による統計的な結論は導けません。');
-
+      sampleSize = rule ? rule.size : Math.min(25, tenPercentRule);
+      basis = `本ツールの参考頻度別ルール${rule ? `（${rule.label}）` : ''}による非統計的サンプリングです。監査基準が定める固定件数ではありません。所属法人等のメソドロジーを確認し、職業的専門家としてサンプル数を決定してください。`;
+      warnings.push('非統計的サンプリングを選択しています。表示件数は参考値です。所属法人等のルールと置き換え、上限逸脱率だけから統計的な結論を導かないでください。');
       formula = {
-        expression: 'n = 頻度別ルール（実務慣行）',
-        substituted: `n = ${FREQUENCY_LABELS[frequency] || frequency}・母集団${group(populationSize)}件 → ${group(sampleSize)}件（実務慣行）`,
+        expression: 'n = 参考頻度別ルール（所属法人等のメソドロジーを要確認）',
+        substituted: `n = ${FREQUENCY_LABELS[frequency] || frequency}・母集団${group(populationSize)}件 → ${group(sampleSize)}件（非統計的）`,
         result: sampleSize
       };
     }
 
     let fullPopulation = false;
-    if (populationSize > 0 && populationSize < sampleSize) {
+    if (sampleSize > 0 && populationSize < sampleSize) {
       sampleSize = populationSize;
       fullPopulation = true;
       basis = '母集団が必要サンプル数より少ないため、全件を確認します。';
-      warnings.push('母集団が推奨サンプル数より少ないため、全件を対象とします。');
+      warnings.push('母集団が算定件数より少ないため、全件を対象とします。');
       formula = {
         expression: 'n = 母集団件数（全件）',
         substituted: `n = ${group(populationSize)}件（全件確認）`,
@@ -344,12 +346,12 @@
       };
     }
 
-    // 予想逸脱率が許容逸脱率に達している場合、サンプリング自体が成立しない
     if (sampleSize > 0 && expectedDeviations / sampleSize >= tolerableRate) {
-      warnings.push('予想逸脱率が許容逸脱率以上です。統制に依拠しない方針への変更を検討してください。');
+      warnings.push('計画上の予想逸脱率が許容逸脱率以上です。統制に依拠する監査アプローチを再検討してください。');
     }
 
     return {
+      valid: sampleSize > 0,
       frequency,
       frequencyLabel: FREQUENCY_LABELS[frequency] || frequency,
       populationSize,
@@ -363,6 +365,7 @@
       additionalSamples,
       fullPopulation,
       statistical,
+      samplingApproach,
       derivedFromExactBinomial: derived,
       exactMinimumSampleSize,
       warnings,
@@ -381,57 +384,45 @@
     const deviations = Math.max(0, Math.floor(toFiniteNumber(s.deviations, 0)));
     const tolerableRate = toFiniteNumber(s.tolerableRate, 0.09);
     const roo = normalizeROO(s.ROO);
+    const statistical = s.statistical !== false;
     const warnings = [];
 
     if (sampleSize <= 0) {
       return {
         valid: false,
-        sampleSize, deviations, tolerableRate, ROO: roo,
+        sampleSize, deviations, tolerableRate, ROO: roo, statistical,
         deviationRate: NaN, upperDeviationLimit: NaN,
-        effective: false, evaluation: '算定不能', requiredAction: 'サンプル数を入力してください',
+        effective: null, evaluation: '算定不能', requiredAction: 'サンプル数を入力してください',
         warnings: ['サンプル数を入力してください。'],
         basis: 'サンプル数が未入力のため評価できません。',
         formula: { expression: 'ULD = BetaInv(1 − ROO, x + 1, n − x)', substituted: '—', result: NaN }
       };
     }
 
-    if (deviations > sampleSize) {
-      warnings.push('逸脱件数がサンプル数を超えています。入力を確認してください。');
-    }
-
+    if (deviations > sampleSize) warnings.push('逸脱件数がサンプル数を超えています。入力を確認してください。');
     const cappedDeviations = Math.min(deviations, sampleSize);
     const deviationRate = cappedDeviations / sampleSize;
     const uld = upperDeviationLimit(sampleSize, cappedDeviations, roo);
 
-    // 判定は ULD のみから決まる（単一経路）
-    const effective = uld <= tolerableRate;
+    let effective = null;
+    let evaluation = '職業的専門家としての判断が必要';
+    let requiredAction = '逸脱の性質・原因・影響を評価し、所属法人等のメソドロジーに従って結論付けてください。';
 
-    let evaluation;
-    let requiredAction;
-    if (effective) {
-      evaluation = '有効';
-      requiredAction = cappedDeviations === 0
-        ? '追加手続不要。計画どおり統制に依拠できる。'
-        : '追加手続不要。逸脱の原因分析は実施すること。';
+    if (statistical) {
+      effective = uld <= tolerableRate;
+      if (effective) {
+        evaluation = '統計的上限は許容範囲内';
+        requiredAction = '逸脱の性質・原因・影響と、サンプルが母集団を代表しているかを含めて最終評価してください。';
+      } else {
+        evaluation = '計画した統制依拠を支持しない';
+        requiredAction = '逸脱の性質・原因・影響を調査し、統制への依拠の見直し、追加手続又は実証手続の拡大を検討してください。';
+        warnings.push('上限逸脱率が許容逸脱率を超えています。追加サンプルだけで機械的に結論を反転させず、原因と監査アプローチを再評価してください。');
+      }
     } else {
-      evaluation = '無効（統制の不備）';
-      requiredAction = '統制への依拠を取りやめて実証手続を拡大するか、サンプルを追加して再評価してください。';
+      warnings.push('非統計的サンプリングのため、上限逸脱率は参考値です。この数値だけから統計的な結論は導けません。');
     }
 
-    // 追加サンプルで有効に転じうるかを提示（判定そのものは変えない）
-    let additionalSamplesToPass = null;
-    if (!effective) {
-      for (let extra = 1; extra <= 2000; extra++) {
-        if (upperDeviationLimit(sampleSize + extra, cappedDeviations, roo) <= tolerableRate) {
-          additionalSamplesToPass = extra;
-          break;
-        }
-      }
-      if (additionalSamplesToPass !== null) {
-        warnings.push(`追加サンプル ${group(additionalSamplesToPass)} 件で追加の逸脱が発見されなければ、上限逸脱率は許容逸脱率以下となります。`);
-      }
-    }
-
+    const comparison = statistical ? (effective ? '≤' : '>') : '（参考）';
     return {
       valid: true,
       sampleSize,
@@ -439,17 +430,20 @@
       tolerableRate,
       ROO: roo,
       confidenceLevel: 1 - roo,
+      statistical,
       deviationRate,
       upperDeviationLimit: uld,
       effective,
       evaluation,
       requiredAction,
-      additionalSamplesToPass,
+      additionalSamplesToPass: null,
       warnings,
-      basis: `正確二項（Clopper–Pearson）による片側上限です。過信リスク ROO=${pct(roo, 0)}。上限逸脱率 ${pct(uld)} を許容逸脱率 ${pct(tolerableRate, 0)} と比べて判定しています。`,
+      basis: statistical
+        ? `正確二項（Clopper–Pearson）による片側上限です。過信リスク ROO=${pct(roo, 0)}。上限逸脱率 ${pct(uld)} と許容逸脱率 ${pct(tolerableRate, 0)} を比較した統計的結果であり、統制不備の最終判断そのものではありません。`
+        : `正確二項による参考値です。設計が非統計的なため、ROO=${pct(roo, 0)} に基づく統計的結論としては使用できません。`,
       formula: {
         expression: 'ULD = BetaInv(1 − ROO, x + 1, n − x)',
-        substituted: `ULD = BetaInv(${(1 - roo).toFixed(2)}, ${cappedDeviations + 1}, ${sampleSize - cappedDeviations}) = ${pct(uld)} ${effective ? '≤' : '>'} ${pct(tolerableRate, 0)} → ${evaluation}`,
+        substituted: `ULD = BetaInv(${(1 - roo).toFixed(2)}, ${cappedDeviations + 1}, ${sampleSize - cappedDeviations}) = ${pct(uld)} ${comparison} ${pct(tolerableRate, 0)} → ${evaluation}`,
         result: uld
       }
     };
@@ -464,53 +458,40 @@
     const AR = toFiniteNumber(s.AR, 0.05);
     const IR = toFiniteNumber(s.IR, 1);
     const CR = toFiniteNumber(s.CR, 1);
+    const RIA = toFiniteNumber(s.RIA, 0.10);
     const roo = normalizeROO(s.ROO);
     const warnings = [];
 
-    if (!(IR > 0 && CR > 0)) {
+    if (!(AR > 0) || !(IR > 0) || !(CR > 0) || !(RIA > 0) || !(RIA < 1)) {
       return {
-        valid: false, AR, IR, CR, DR: NaN, RIA: NaN, ROO: roo,
+        valid: false, AR, IR, CR, DR: NaN, RIA, ROO: roo,
         clamped: false, clampedFrom: null,
-        warnings: ['固有リスク・統制リスクは0より大きい値を指定してください。'],
+        warnings: ['監査リスク、固有リスク、統制リスク及び受入リスクを正しく入力してください。'],
         basis: 'リスク値が不正のため算定できません。',
         formula: { expression: 'DR = AR ÷ (IR × CR)', substituted: '—', result: NaN }
       };
     }
 
     const DR = AR / (IR * CR);
-    const RIA = clamp(DR, RIA_MIN, RIA_MAX);
-    const clamped = Math.abs(RIA - DR) > 1e-12;
 
-    if (clamped) {
-      if (DR > RIA_MAX) {
-        warnings.push(`発見リスク ${pct(DR, 1)} は上限 ${pct(RIA_MAX, 0)} に調整されました。サンプル数はこの上限に基づいて算定されています。`);
-      } else {
-        warnings.push(`発見リスク ${pct(DR, 1)} は下限 ${pct(RIA_MIN, 0)} に調整されました。サンプル数はこの下限に基づいて算定されています。`);
-      }
-    }
-
-    // 監査基準報告書315 第33項:
-    //   「監査人が内部統制の運用状況の有効性を評価する場合は、統制リスクを評価しなければならない。
-    //     監査人が内部統制の運用状況の有効性を評価しない場合は、
-    //     重要な虚偽表示リスクと固有リスクは同じ評価となる。」
-    // 統制リスクを1.00未満に置くことは運用評価手続の実施を前提とする。
     if (CR < 1) {
-      warnings.push(`統制リスク CR=${CR} と評価しています。CR を 1.00 未満とするには、内部統制の運用評価手続（統制テスト）を実施し、その有効性を裏づける必要があります（監査基準報告書315 第33項）。統制テストを実施しない場合、統制リスクは 1.00 として実証手続を計画してください。`);
+      warnings.push(`統制リスク CR=${CR} と評価しています。CRを1.00未満とする場合は、関連する統制テストを計画・実施し、その有効性を裏付けてください。`);
     }
+    warnings.push('発見リスク（DR）は分析的実証手続などを含む実証手続全体のリスクです。本ツールはDRをMUSの受入リスク（RIA）へ自動変換しません。RIAは監査計画及び所属法人等のメソドロジーに従って別途設定してください。');
 
     return {
       valid: true,
       AR, IR, CR, DR, RIA,
       ROO: roo,
       confidenceLevel: 1 - RIA,
-      clamped,
-      clampedFrom: clamped ? DR : null,
+      clamped: false,
+      clampedFrom: null,
       warnings,
-      basis: `監査リスクモデル DR = AR ÷ (IR × CR) です。実証手続には RIA（受入リスク）を、統制テストには ROO（過信リスク）を使います。RIA は ${pct(RIA_MIN, 0)}〜${pct(RIA_MAX, 0)} の範囲に収めます。ROO は統制にどこまで依拠するかに応じて選ぶ、独立したパラメータです。`,
+      basis: `監査リスクモデル DR = AR ÷ (IR × CR) です。DRは実証手続全体に係る発見リスク、RIAは金額単位サンプリングに係る受入リスク、ROOは統制テストの過信リスクであり、それぞれ目的が異なるため独立して設定します。`,
       formula: {
-        expression: 'DR = AR ÷ (IR × CR)',
-        substituted: `DR = ${pct(AR, 0)} ÷ (${IR} × ${CR}) = ${pct(DR, 1)}${clamped ? ` → RIA = ${pct(RIA, 0)}（クリップ適用）` : ` → RIA = ${pct(RIA, 1)}`}`,
-        result: RIA
+        expression: 'DR = AR ÷ (IR × CR) ／ RIA・ROOは別途設定',
+        substituted: `DR = ${pct(AR, 0)} ÷ (${IR} × ${CR}) = ${pct(DR, 1)} ／ RIA = ${pct(RIA, 0)} ／ ROO = ${pct(roo, 0)}`,
+        result: DR
       }
     };
   }
@@ -519,17 +500,6 @@
    * 4. 金額単位サンプリング（BS・PL共通）— §3.2
    * ========================================================================== */
 
-  // PL 最低件数フロアの区分は RIA から導出する（独立セレクタを廃止）
-  function riskBandFromRIA(RIA) {
-    if (RIA >= 0.15) return { key: 'low', label: '低', floor: 30 };
-    if (RIA >= 0.05) return { key: 'medium', label: '中', floor: 60 };
-    return { key: 'high', label: '高', floor: 90 };
-  }
-
-  /**
-   * calculateMonetarySampling
-   * @param {{BV, TM, EM, RIA, accountType, assertion, method, transactionCount, highValueTotal}} input
-   */
   function calculateMonetarySampling(input) {
     const s = input || {};
     const BV = Math.max(0, toFiniteNumber(s.BV, 0));
@@ -542,167 +512,86 @@
     const transactionCount = Math.max(0, Math.floor(toFiniteNumber(s.transactionCount, 0)));
     const highValueTotal = s.highValueTotal === undefined || s.highValueTotal === null
       ? null : Math.max(0, toFiniteNumber(s.highValueTotal, 0));
-
     const warnings = [];
 
     if (!(BV > 0) || !(TM > 0) || !(RIA > 0) || !(RIA < 1)) {
       return {
         valid: false, sampleSize: 0, accountType,
-        warnings: ['母集団簿価・許容誤謬・受入リスクを正しく入力してください。'],
+        warnings: ['母集団簿価、許容誤謬及び受入リスクを正しく入力してください。'],
         basis: '入力が不足しているため算定できません。',
         formula: { expression: 'n = BV × CF ÷ (TM − EM × EF)', substituted: '—', result: NaN }
       };
     }
 
     const CF = -Math.log(RIA);
-    const denominator = TM - EM * EXPANSION_FACTOR;
+    const EF = standardExpansionFactor(RIA);
+    const denominator = TM - EM * EF;
 
     if (denominator <= 0) {
       return {
-        valid: false, sampleSize: 0, accountType, CF, EF: EXPANSION_FACTOR,
-        warnings: [`期待誤謬 × 拡大係数（${group(EM * EXPANSION_FACTOR)}円）が許容誤謬（${group(TM)}円）以上です。サンプリングは成立しません。全件検証または母集団の見直しを検討してください。`],
-        basis: '許容誤謬から期待誤謬の拡大分を差し引いた残りが0以下のため、統計的サンプリングは成立しません。',
+        valid: false, sampleSize: 0, accountType, CF, EF,
+        warnings: [`期待誤謬 × 拡大係数（${group(EM * EF)}円）が許容誤謬（${group(TM)}円）以上です。全件検証、母集団の見直し又は他の監査手続を検討してください。`],
+        basis: '許容誤謬から期待誤謬の取り置きを控除した残額が0以下のため、サンプリング設計が成立しません。',
         formula: {
           expression: 'n = BV × CF ÷ (TM − EM × EF)',
-          substituted: `TM − EM × EF = ${group(TM)} − ${group(EM)}×${EXPANSION_FACTOR} = ${group(denominator)} ≤ 0 → 算定不能`,
+          substituted: `TM − EM × EF = ${group(TM)} − ${group(EM)}×${EF.toFixed(2)} = ${group(denominator)} ≤ 0 → 算定不能`,
           result: NaN
         }
       };
     }
 
-    // サンプリング間隔は BV/n ではなく直接算出する（丸め誤差を伝播させない）
     const SI = denominator / CF;
     const rawSampleSize = (BV * CF) / denominator;
+    let n = Math.ceil(rawSampleSize);
 
-    // 基本精度 = CF × SI = TM − EM×EF が恒等的に成立する。
-    // したがって EM=0 のとき基本精度は許容誤謬と一致し、誤謬を1件でも発見した時点で
-    // 推定誤謬上限が許容誤謬を超える。既定値のまま設計すると必ずこの状態になるため明示する。
     if (EM === 0) {
-      warnings.push('期待誤謬を0としているため、基本精度が許容誤謬と一致します（基本精度 = TM − EM×EF）。この設計では誤謬を1件でも発見すると推定誤謬上限が許容誤謬を超え「受入不可」となります。誤謬の発生が見込まれる場合は期待誤謬を設定してください。');
-    } else {
-      // 拡大係数は本来「信頼度に対応する」係数であり、単一の定数ではない。
-      //   監査基準報告書530 研究文書第1号 6-4:
-      //   「誤謬予想額に…信頼度に対応する拡張係数を掛け合わせて、
-      //     最大許容誤謬額から控除する誤謬見積額を計算します」
-      //   同項の設例は信頼度75%（リスク25%）で拡張係数 1.25 であり、標準表と一致する。
-      // 本ツールは仕様により EF=1.6 に固定しているため、RIA が 5% から離れるほど
-      // 標準表の値とずれる。RIA < 5% では標準値のほうが大きく、取り置きが不足する。
-      const standard = standardExpansionFactor(RIA);
-      if (standard > EXPANSION_FACTOR + 1e-9) {
-        warnings.push(`拡大係数 EF=${EXPANSION_FACTOR} は受入リスク5%に対応する値です。RIA=${pct(RIA, 0)} では標準的な拡大係数は ${standard.toFixed(2)} であり、本ツールの固定値のほうが小さいため、期待誤謬の取り置きが不足します。サンプル数が必要数を下回る可能性があるため、期待誤謬を厚めに設定することを検討してください。`);
-      } else if (standard < EXPANSION_FACTOR - 1e-9) {
-        warnings.push(`拡大係数 EF=${EXPANSION_FACTOR} は受入リスク5%に対応する値です。RIA=${pct(RIA, 0)} では標準的な拡大係数は ${standard.toFixed(2)} であり、本ツールの固定値のほうが大きいため、サンプル数は保守側（多め）に算定されています。`);
-      }
+      warnings.push('期待誤謬を0としています。誤謬の発生が見込まれる場合は、過年度実績や予備的なテスト等を踏まえて期待誤謬を設定してください。');
     }
-
-    let adjusted = rawSampleSize;
-    let assertionFactor = 1;
-    let methodFactor = 1;
-    let band = null;
-    let floorApplied = false;
-    let capApplied = null;
-
     if (accountType === 'pl') {
-      if (assertion === 'completeness') assertionFactor = 1.5;
-      if (method === 'stratified') methodFactor = 0.85;
-      adjusted = rawSampleSize * assertionFactor * methodFactor;
+      warnings.push('BS・PLの区分だけではMUSの計算式を変更しません。母集団の特性、アサーション及び監査目的に応じて適用可能性を判断してください。');
+    }
+    if (method === 'stratified') {
+      warnings.push('層化を選択しています。各層の母集団、許容誤謬及び抽出方法を別途設計してください。本ツールは層化を理由にサンプル数を自動減額しません。');
+    }
+    if (assertion === 'completeness') {
+      warnings.push('MUSは計上済み簿価から金額比例で抽出するため、未計上項目や簿価0の項目の完全性検証には適しません。母集団外から帳簿へ追跡する手続等を別途設計してください。');
     }
 
-    // 丸めはここで一度だけ
-    let n = Math.ceil(adjusted);
-
-    if (accountType === 'pl') {
-      band = riskBandFromRIA(RIA);
-
-      // フロアは上限より優先する（BUG-08）
-      if (n < band.floor) {
-        n = band.floor;
-        floorApplied = true;
-      }
-
-      // 10%上限はフロアを下回らない範囲でのみ適用する
-      if (transactionCount > 0) {
-        const softCap = Math.ceil(transactionCount * 0.1);
-        if (n > softCap && softCap >= band.floor) {
-          const beforeCap = n;
-          n = softCap;
-          capApplied = '母集団件数の10%';
-          // 上限で切り詰めた時点で、入力した RIA に対応する信頼水準は達成されない。
-          // 監査基準報告書530 第6項は「サンプリングリスクを許容可能な低い水準に
-          // 抑えるために、十分なサンプル数を決定しなければならない」と要求している。
-          warnings.push(`算定値 ${group(beforeCap)} 件を母集団件数の10%（${group(softCap)} 件）で頭打ちにしています。この上限により、受入リスク ${pct(RIA, 0)} に対応する信頼水準は達成されません。上限を適用する妥当性を検討してください。`);
-        }
-        if (transactionCount < band.floor) {
-          warnings.push(`母集団 ${group(transactionCount)} 件では最低件数フロア ${band.floor} 件を満たせません。全件検証を検討してください。`);
-        }
-      }
-
-      if (n > PL_ABSOLUTE_CAP) {
-        n = PL_ABSOLUTE_CAP;
-        capApplied = '絶対上限500件';
-        warnings.push('算定結果が絶対上限500件を超えたため500件で頭打ちにしています。母集団の階層化を検討してください。');
-      }
-
-    }
-
-    // 母集団件数を超えるサンプル数は成立しない。BS・PL のいずれにも適用する。
     let fullPopulation = false;
     if (transactionCount > 0 && n > transactionCount) {
-      warnings.push(`必要サンプル数 ${group(n)} 件が母集団件数 ${group(transactionCount)} 件を超えたため、全件を対象とします。金額単位サンプリングではなく精査として設計してください。`);
+      warnings.push(`算定された選択ポイント数 ${group(n)} が母集団件数 ${group(transactionCount)} を超えています。全件検証として設計してください。`);
       n = transactionCount;
       fullPopulation = true;
     }
 
-    // 金額単位サンプリングは計上済みの母集団から金額に比例して抽出するため、
-    // 計上漏れ（網羅性）の検証には構造的に向かない。
-    if (assertion === 'completeness') {
-      warnings.push('金額単位サンプリングは計上済みの母集団から金額に比例して抽出する手法のため、計上漏れ（網羅性）の検証には適していません。網羅性については、出荷記録や入金記録など母集団の外側から逆方向に突合する手続を別途設計してください。');
-    }
-
-    // カバレッジ率: 意味のある定義に置換（BUG-06）
     let coverage = null;
     let coverageBasis;
     if (highValueTotal !== null) {
-      const normalSampleAmount = Math.max(0, Math.min(BV - highValueTotal, n * SI));
-      coverage = Math.min(1, (highValueTotal + normalSampleAmount) / BV);
-      coverageBasis = 'カバレッジ = (SI以上の高額項目の合計額 + 通常サンプルの抽出額) ÷ BV';
+      if (highValueTotal > BV) warnings.push('確実抽出項目の合計額が母集団簿価を超えています。入力を確認してください。');
+      coverage = Math.min(1, highValueTotal / BV);
+      coverageBasis = '確実抽出項目比率 = SI以上の項目合計額 ÷ 母集団簿価';
     } else {
-      coverageBasis = '高額項目（SI以上）の合計額が未入力のため算定不能。';
-      warnings.push('カバレッジ率は高額項目の合計額を入力すると算定されます。');
+      coverageBasis = 'SI以上の項目合計額が未入力のため、確実抽出項目比率は算定していません。';
+      warnings.push('SI以上となる確実抽出項目の合計額を入力すると、その比率を確認できます。');
     }
 
-    const denomText = EM > 0
-      ? `(${group(TM)} − ${group(EM)}×${EXPANSION_FACTOR})`
-      : `${group(TM)}`;
-    let substituted = `n = ${group(BV)} × ${CF.toFixed(2)} ÷ ${denomText} = ${group(n)}件`;
-    if (accountType === 'pl' && (assertionFactor !== 1 || methodFactor !== 1 || floorApplied || capApplied)) {
-      const parts = [];
-      if (assertionFactor !== 1) parts.push(`網羅性×${assertionFactor}`);
-      if (methodFactor !== 1) parts.push(`階層化×${methodFactor}`);
-      if (floorApplied) parts.push(`フロア${band.floor}件適用`);
-      if (capApplied) parts.push(`${capApplied}適用`);
-      substituted = `n = ${group(BV)} × ${CF.toFixed(2)} ÷ ${denomText} → ${parts.join('・')} = ${group(n)}件`;
-    }
-
-    let basis = `金額単位サンプリング（MUS/PPS、ポアソン近似）です。信頼係数 CF = −ln(RIA) = ${CF.toFixed(2)}、拡大係数 EF = ${EXPANSION_FACTOR}。サンプリング間隔は (TM − EM×EF) ÷ CF から直接求めているため、BV÷n の丸め誤差が間隔に伝わりません。`;
-    if (accountType === 'pl') {
-      basis += ` PL項目では、共通式のあとに監査要点と手法による調整、および最低件数フロア（リスク区分${band.label}＝${band.floor}件。RIA ${pct(RIA, 0)} から決まります）を適用します。`;
-    }
+    const denomText = `(${group(TM)} − ${group(EM)}×${EF.toFixed(2)})`;
+    const substituted = `n = ${group(BV)} × ${CF.toFixed(2)} ÷ ${denomText} = ${rawSampleSize.toFixed(2)} → ${group(n)}ポイント`;
+    const basis = `金額単位サンプリング（MUS/PPS、ポアソン近似）です。信頼係数 CF = −ln(RIA) = ${CF.toFixed(2)}、RIAに対応する拡大係数 EF = ${EF.toFixed(2)}。サンプリング間隔は (TM − EM×EF) ÷ CF で求めます。算定件数は選択ポイント数であり、同一項目が複数回ヒットする場合はユニークな証憑・項目数と一致しないことがあります。`;
 
     return {
       valid: true,
       accountType,
-      BV, TM, EM, RIA, CF,
-      EF: EXPANSION_FACTOR,
+      BV, TM, EM, RIA, CF, EF,
       denominator,
       rawSampleSize,
       sampleSize: n,
       samplingInterval: SI,
-      assertionFactor,
-      methodFactor,
-      riskBand: band,
-      floorApplied,
-      capApplied,
+      assertionFactor: 1,
+      methodFactor: 1,
+      riskBand: null,
+      floorApplied: false,
+      capApplied: null,
       coverage,
       coverageBasis,
       transactionCount,
@@ -834,48 +723,53 @@
       const auditValue = toFiniteNumber(row && row.auditValue, 0);
       const difference = bookValue - auditValue;
       if (difference > 0) {
-        overstatements.push({ bookValue, errorAmount: difference });
+        if (bookValue > 0) overstatements.push({ bookValue, errorAmount: difference });
+        else warnings.push('簿価が0以下の過大計上行はMUS投影から除外しました。個別に評価してください。');
       } else if (difference < 0) {
-        // 過小計上は破棄せず別建てで集計する（BUG-09-3）
         understatements.push({ bookValue, errorAmount: -difference });
       }
     }
 
-    // 誤謬件数に上限は設けない（BUG-09-2）
     const over = projectOneDirection(overstatements, SI, RIA);
-    const under = projectOneDirection(understatements, SI, RIA);
+    const knownUnderstatement = understatements.reduce(function(sum, item) { return sum + item.errorAmount; }, 0);
+    const under = {
+      count: understatements.length,
+      sampledCount: understatements.length,
+      highValueCount: 0,
+      basicPrecision: 0,
+      projectedMisstatement: knownUnderstatement,
+      incrementalAllowance: 0,
+      upperMisstatementLimit: null,
+      knownMisstatement: knownUnderstatement,
+      projected: false,
+      detail: understatements.map(function(item) {
+        return { bookValue: item.bookValue, errorAmount: item.errorAmount, projected: false };
+      })
+    };
 
-    if (understatements.length > 0) {
-      warnings.push(`過小計上が ${group(understatements.length)} 件あります。過大計上とは別に推定誤謬上限を算定しています。両方を評価してください。`);
+    if (under.count > 0) {
+      warnings.push(`過小計上が ${group(under.count)} 件（既知額 ${group(knownUnderstatement)}円）あります。MUSは計上済み簿価から金額比例で抽出するため、過小計上・未計上を統計的に投影しません。完全性に対応する別の手続を実施し、発見した誤謬は監基報450等に従って評価してください。`);
     }
 
-    const maxCount = Math.max(over.count, under.count);
-    if (maxCount > MANY_ERRORS_THRESHOLD) {
-      warnings.push(`誤謬件数が ${group(maxCount)} 件に達しています。サンプリングの前提（誤謬はまれである）が崩れているため、統計的な結論の信頼性は低下します。母集団全体の見直しを検討してください。`);
+    const totalErrorCount = over.count + under.count;
+    if (totalErrorCount > MANY_ERRORS_THRESHOLD) {
+      warnings.push(`誤謬件数が ${group(totalErrorCount)} 件に達しています。母集団の誤謬特性とサンプリング設計を再評価してください。`);
     }
 
+    const governingUML = over.upperMisstatementLimit;
     let evaluation = null;
     let acceptable = null;
-    const governingUML = Math.max(over.upperMisstatementLimit, under.upperMisstatementLimit);
-
     if (tolerableMisstatement !== null && tolerableMisstatement > 0) {
       acceptable = governingUML <= tolerableMisstatement;
+      evaluation = acceptable
+        ? '統計的上限は許容誤謬以下'
+        : '統計的上限が許容誤謬を超過';
       if (!acceptable) {
-        evaluation = '受入不可（追加手続必要）';
-      } else if (governingUML < tolerableMisstatement * 0.5) {
-        evaluation = '受入可能（余裕あり）';
-      } else if (governingUML < tolerableMisstatement * 0.75) {
-        evaluation = '受入可能（標準）';
-      } else {
-        evaluation = '受入可能（条件付き）';
-      }
-      if (!acceptable) {
-        warnings.push(`推定誤謬上限（${group(governingUML)}円）が許容誤謬（${group(tolerableMisstatement)}円）を超過しています。`);
+        warnings.push(`過大計上の推定誤謬上限（${group(governingUML)}円）が許容誤謬（${group(tolerableMisstatement)}円）を超過しています。母集団、誤謬の性質・原因、追加手続及び監査計画への影響を評価してください。`);
       }
     }
 
     const cf0 = poissonConfidenceFactor(0, RIA);
-
     return {
       valid: true,
       SI, RIA,
@@ -887,11 +781,11 @@
       acceptable,
       evaluation,
       warnings,
-      basis: `PPS（MUS）による誤謬評価です。基本精度 = CF(0, RIA) × SI = ${cf0.toFixed(2)} × ${group(SI)}円。汚染率は「誤謬額 ÷ 個別項目の簿価」で求め、項目の簿価が SI 以上の場合は誤謬額の実額を推定誤謬とします。増分許容誤謬は、汚染率の高い順に (CF(i) − CF(i−1) − 1) × 推定誤謬_i を積み上げます。信頼係数は RIA=${pct(RIA, 0)} からポアソン分位として求めており、90%固定ではありません。過大計上と過小計上は別々に集計しています。`,
+      basis: `PPS（MUS）による過大計上の誤謬評価です。基本精度 = CF(0, RIA) × SI = ${cf0.toFixed(2)} × ${group(SI)}円。汚染率は「誤謬額 ÷ 個別項目の簿価」で求め、簿価がSI以上の項目は誤謬実額を用います。増分許容誤謬は汚染率の高い順に積み上げます。過小計上は既知額のみを別表示し、MUSによる投影対象にはしていません。`,
       formula: {
-        expression: 'UML = 基本精度 + Σ推定誤謬 + Σ(CF(i) − CF(i−1) − 1) × 推定誤謬_i',
-        substituted: `UML(過大) = ${group(over.basicPrecision)} + ${group(over.projectedMisstatement)} + ${group(over.incrementalAllowance)} = ${group(over.upperMisstatementLimit)}円`
-          + (under.count > 0 ? `／UML(過小) = ${group(under.upperMisstatementLimit)}円` : ''),
+        expression: 'UML（過大計上）= 基本精度 + Σ推定誤謬 + Σ(CF(i) − CF(i−1) − 1) × 推定誤謬_i',
+        substituted: `UML（過大）= ${group(over.basicPrecision)} + ${group(over.projectedMisstatement)} + ${group(over.incrementalAllowance)} = ${group(over.upperMisstatementLimit)}円`
+          + (under.count > 0 ? `／既知の過小計上額 = ${group(knownUnderstatement)}円（別途評価）` : ''),
         result: over.upperMisstatementLimit
       }
     };
