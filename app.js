@@ -105,9 +105,10 @@
 
   /* --------------------------------------------------------- モードタブ */
 
-  const MODES = ['design', 'stats', 'theory', 'ai'];
+  const MODES = ['design', 'stats', 'theory', 'selection', 'ai'];
 
-  function switchMode(mode) {
+  function switchMode(mode, updateHash) {
+    if (!MODES.includes(mode)) return;
     MODES.forEach(function(name) {
       const tab = $('tab-' + name);
       const panel = $('panel-' + name);
@@ -115,7 +116,17 @@
       if (panel) panel.hidden = name !== mode;
     });
     if (mode === 'theory') renderQuickReference();
+    if (updateHash && window.location.hash !== '#' + mode) {
+      window.history.replaceState(null, '', '#' + mode);
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function modeFromHash() {
+    const hash = window.location.hash.slice(1);
+    const aliases = { calculate: 'design', learn: 'theory' };
+    const mode = aliases[hash] || hash;
+    return MODES.includes(mode) ? mode : null;
   }
 
   /* ------------------------------------------------ ①対象／テスト種別 */
@@ -659,7 +670,7 @@
     // モードタブ
     MODES.forEach(function(name) {
       const tab = $('tab-' + name);
-      if (tab) tab.addEventListener('click', function() { switchMode(name); });
+      if (tab) tab.addEventListener('click', function() { switchMode(name, true); });
     });
 
     // 入力の変化はすべて再計算に集約する
@@ -724,6 +735,12 @@
     addMisstatementRow();
     recalcAll();
     renderQuickReference();
+    const initialMode = modeFromHash();
+    if (initialMode && initialMode !== 'design') switchMode(initialMode, false);
+    window.addEventListener('hashchange', function() {
+      const mode = modeFromHash();
+      if (mode) switchMode(mode, false);
+    });
     setText('buildStamp', '算定時刻: ' + new Date().toLocaleString('ja-JP'));
   }
 
