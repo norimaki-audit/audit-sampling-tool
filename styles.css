@@ -548,6 +548,61 @@ select.form-input { padding-right: 6px; }
   margin-bottom: 4px;
 }
 
+/* AI関連文書の更新一覧 */
+.ai-document-list {
+  display: grid;
+  gap: var(--s3);
+}
+.ai-document {
+  background: var(--c-surface);
+  border: 1px solid var(--c-rule);
+  border-left: 2px solid var(--c-primary);
+  padding: 14px 16px;
+}
+.ai-document-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  color: var(--c-text-faint);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: .05em;
+}
+.ai-document-meta time {
+  color: var(--c-primary-d);
+  font-weight: 700;
+}
+.theory-body .ai-document h4 {
+  border-bottom: none;
+  font-family: var(--font-sans);
+  font-size: 14.5px;
+  line-height: 1.55;
+  margin: 5px 0 7px;
+  padding: 0;
+}
+.ai-document p {
+  color: var(--c-doc-mid);
+  font-size: 13px;
+  line-height: 1.75;
+}
+.ai-document .ai-document-point {
+  background: var(--c-surface-2);
+  border-top: 1px solid var(--c-line);
+  color: var(--c-text);
+  margin-top: 10px;
+  padding: 9px 10px;
+}
+.ai-document-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s3);
+  margin-top: 9px;
+}
+.ai-document-links a {
+  font-size: 11px;
+  font-weight: 600;
+}
+
 /* 誤解しやすい点 */
 .misread { display: grid; gap: 6px; margin-top: .8em; }
 .misread-item {

@@ -1743,8 +1743,62 @@ UML          = 基本精度 + Σ推定誤謬 + 増分許容誤謬</div>
       </div>
     </details>
 
+    <details class="theory-section" open>
+      <summary><span class="secno">07</span>最新関連文書（2026年8月時点）</summary>
+      <div class="theory-body">
+        <p>
+          AIに関する監査上の議論は、単なる効率化から、<strong>財務報告上のリスク、ツールのガバナンス、品質管理、倫理</strong>へ広がっています。
+          次の文書は、AIで全件を処理できるかだけでなく、監査人がその出力をどのように検証し、監査証拠として扱うかを考えるための更新資料です。
+        </p>
+
+        <div class="ai-document-list">
+          <article class="ai-document">
+            <div class="ai-document-meta"><time datetime="2026-07-22">2026.07</time><span>JICPA / IESBA</span></div>
+            <h4><a href="https://jicpa.or.jp/specialized_field/ITI/2026/20260722ire.html" target="_blank" rel="noopener">新興テクノロジーの特性に基づく倫理的考慮事項</a></h4>
+            <p>AIなど個別技術の名前だけで判断せず、その特性が倫理規則の基本原則にどのような脅威を生じさせ、または増幅するかを検討するアプローチです。IESBAは、次の公表物としてAIに焦点を当てた資料を予定しています。</p>
+            <p class="ai-document-point"><strong>監査での読みどころ:</strong> AIの出力精度だけでなく、客観性、専門能力・正当な注意、守秘義務、説明可能性を利用前に評価します。</p>
+            <div class="ai-document-links"><a href="https://www.ethicsboard.org/publications/emerging-technologies-characteristics-based-approach-ethical-considerations-professional-accountants" target="_blank" rel="noopener">IESBA原文</a></div>
+          </article>
+
+          <article class="ai-document">
+            <div class="ai-document-meta"><time datetime="2026-02-17">2026.02</time><span>JICPA / IAASB</span></div>
+            <h4><a href="https://jicpa.or.jp/specialized_field/ITI/2026/20260217idc.html" target="_blank" rel="noopener">テクノロジー及び品質マネジメントのラウンドテーブル</a></h4>
+            <p>AIを含む新興技術が監査・保証業務と品質マネジメント基準の適用へ与える影響について、2025年下期に240人超の関係者が議論した結果です。ガバナンス、リスク管理、信頼性と一貫性を支える品質管理が中心論点になっています。</p>
+            <p class="ai-document-point"><strong>監査での読みどころ:</strong> ツール単体の性能ではなく、承認、変更管理、利用者教育、出力レビュー、障害時対応までを品質管理の対象として設計します。</p>
+            <div class="ai-document-links"><a href="https://www.iaasb.org/publications/technology-quality-management-roundtables-outcomes-and-next-steps" target="_blank" rel="noopener">IAASB原文</a><a href="https://www.iaasb.org/focus-areas/technology" target="_blank" rel="noopener">Technology更新一覧</a></div>
+          </article>
+
+          <article class="ai-document">
+            <div class="ai-document-meta"><time datetime="2025-06-13">2025.06</time><span>JICPA / CAQ</span></div>
+            <h4><a href="https://jicpa.or.jp/specialized_field/20250613igc.html" target="_blank" rel="noopener">「生成AIの時代の監査」日本語仮訳</a></h4>
+            <p>企業が財務報告に関連するプロセスで生成AIを利用する場合に生じるリスクと、監査人が検討すべき事項を整理したCAQ文書の仮訳です。企業側のAI利用を監査する視点を補います。</p>
+            <p class="ai-document-point"><strong>監査での読みどころ:</strong> 学習データ、モデル出力、アクセス管理、人によるレビュー、財務報告プロセスへの組込み方を理解し、重要な虚偽表示リスクと対応手続へ結び付けます。</p>
+          </article>
+
+          <article class="ai-document">
+            <div class="ai-document-meta"><time datetime="2024-08-13">2024.08</time><span>JICPA</span></div>
+            <h4><a href="https://jicpa.or.jp/specialized_field/20240813dfu.html" target="_blank" rel="noopener">研究文書第11号「監査におけるAIの利用に関する研究文書」</a></h4>
+            <p>監査におけるAIの理解を更新し、具体的な活用方法、導入上の課題、AIが公認会計士の業務と役割にもたらす変化を整理した研究文書です。英訳は2025年4月に公表されています。</p>
+            <p class="ai-document-point"><strong>監査での読みどころ:</strong> AIに適した手続と、人の判断・証憑評価が残る手続を分け、導入目的と限界を監査計画に明示します。</p>
+            <div class="ai-document-links"><a href="https://jicpa.or.jp/specialized_field/20250417jae.html" target="_blank" rel="noopener">英訳公表</a><a href="https://jicpa.or.jp/cpainfo/ai.html" target="_blank" rel="noopener">JICPA「公認会計士業務とAI」</a></div>
+          </article>
+        </div>
+
+        <div class="theory-intuition">
+          <span class="ti-label">このツールへの反映</span>
+          これらの最新文書は、AIがサンプリングを直ちに不要にするとは述べていません。
+          むしろ、全件分析やAIを利用するほど、<strong>入力データの完全性、ツールの品質管理、例外の評価、倫理的な脅威、人による最終判断</strong>を明示的に管理する必要があることを示しています。
+          本ツールでは、全件分析の後も特定項目と残余母集団を分け、必要なサンプリングと誤謬評価を残す設計にしています。
+        </div>
+
+        <p class="basis-line">
+          文書の位置付けは、研究文書、翻訳、非権威的支援資料またはスタッフ文書です。監査基準報告書そのものを置き換えるものではありません。実務では最新版の原文と所属法人の品質管理方針を確認してください。
+        </p>
+      </div>
+    </details>
+
     <details class="theory-section">
-      <summary><span class="secno">07</span>参照した資料</summary>
+      <summary><span class="secno">08</span>参照した資料</summary>
       <div class="theory-body">
         <p>本ページの記述は、次の公表物の原文を確認したうえで整理しています。</p>
         <h4>基準・基準設定主体</h4>
@@ -1755,6 +1809,10 @@ UML          = 基本精度 + Σ推定誤謬 + 増分許容誤謬</div>
           <li>IAASB, Non-Authoritative Support Material Related to Technology: FAQ on Investigating Exceptions and Relevance of Performance Materiality When Using ATT（2023年2月）</li>
           <li>IAASB, FAQ―The Use of Automated Tools and Techniques When Identifying and Assessing Risks of Material Misstatement in Accordance with ISA 315 (Revised 2019)（2020年11月）</li>
           <li>IAASB, The IAASB's Technology Position（2024年9月）／Technology Position: Catalog of Issues and Possible Actions（2025年9月）</li>
+          <li><a href="https://jicpa.or.jp/specialized_field/20240813dfu.html" target="_blank" rel="noopener">JICPA テクノロジー委員会研究文書第11号「監査におけるAIの利用に関する研究文書」</a>（2024年8月、英訳2025年4月）</li>
+          <li><a href="https://jicpa.or.jp/specialized_field/20250613igc.html" target="_blank" rel="noopener">JICPA／CAQ「生成AIの時代の監査」日本語仮訳</a>（2025年6月）</li>
+          <li><a href="https://www.iaasb.org/publications/technology-quality-management-roundtables-outcomes-and-next-steps" target="_blank" rel="noopener">IAASB, Technology Quality Management Roundtables: Outcomes and Next Steps</a>（2026年2月）</li>
+          <li><a href="https://www.ethicsboard.org/publications/emerging-technologies-characteristics-based-approach-ethical-considerations-professional-accountants" target="_blank" rel="noopener">IESBA, Emerging Technologies: A Characteristics-Based Approach</a>（2026年7月）</li>
           <li>PCAOB Release No. 2024-007（2024年6月12日採択、2025年12月15日以後開始事業年度から適用）、AS 1105、AS 2301</li>
           <li>FRC, Addressing Exceptions in the use of Audit Data Analytics（2021年8月）</li>
         </ul>
