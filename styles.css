@@ -62,7 +62,8 @@
   --font-sans: "BIZ UDPGothic", "BIZ UDGothic", "Yu Gothic UI", Meiryo,
                "Hiragino Kaku Gothic ProN", "Noto Sans JP", system-ui, sans-serif;
   --font-serif: "Hiragino Mincho ProN", "Yu Mincho", YuMincho, "Noto Serif JP", serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  --font-mono: "BIZ UDGothic", "Yu Gothic UI", Meiryo,
+               "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
 }
 
 * { box-sizing: border-box; }
