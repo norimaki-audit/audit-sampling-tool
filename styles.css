@@ -59,8 +59,8 @@
   --ease: 160ms cubic-bezier(.2, .6, .2, 1);
 
   /* --- 書体 --- */
-  --font-sans: system-ui, -apple-system, "Hiragino Kaku Gothic ProN", "Yu Gothic",
-               "Noto Sans JP", Meiryo, sans-serif;
+  --font-sans: "BIZ UDPGothic", "BIZ UDGothic", "Yu Gothic UI", Meiryo,
+               "Hiragino Kaku Gothic ProN", "Noto Sans JP", system-ui, sans-serif;
   --font-serif: "Hiragino Mincho ProN", "Yu Mincho", YuMincho, "Noto Serif JP", serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
 }
@@ -73,9 +73,10 @@ body {
   background: var(--c-bg);
   color: var(--c-text);
   font-family: var(--font-sans);
-  font-size: 13.5px;
-  line-height: 1.55;
+  font-size: 14px;
+  line-height: 1.65;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
   min-height: 100vh;
 }
 
@@ -105,18 +106,18 @@ input, select, .rc-value, .qr-table td, .ms-diff { font-variant-numeric: tabular
   gap: var(--s3);
   flex-wrap: wrap;
 }
-.appbar h1 { font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
+.appbar h1 { font-size: 16px; font-weight: 700; letter-spacing: 0; }
 .appbar .version {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--c-text-faint);
   margin-top: 2px;
 }
 .scope-tags { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
 .scope-tag {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: .06em;
+  letter-spacing: 0;
   color: var(--c-primary-d);
   background: var(--c-primary-tint);
   border: 1px solid var(--c-primary-bd);
@@ -142,7 +143,7 @@ input, select, .rc-value, .qr-table td, .ms-diff { font-variant-numeric: tabular
   border: none;
   background: transparent;
   padding: 10px 20px;
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--c-text-mid);
   cursor: pointer;
@@ -185,14 +186,14 @@ input, select, .rc-value, .qr-table td, .ms-diff { font-variant-numeric: tabular
   color: #fff;
   display: grid;
   place-items: center;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
-.step-head h2 { font-size: 14px; font-weight: 700; }
+.step-head h2 { font-size: 15px; font-weight: 700; }
 .step-head .step-sub {
   margin-left: auto;
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--c-text-faint);
   font-weight: 400;
   text-align: right;
@@ -209,7 +210,7 @@ input, select, .rc-value, .qr-table td, .ms-diff { font-variant-numeric: tabular
 
 .form-group { display: flex; flex-direction: column; }
 .form-label {
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--c-text-mid);
   margin-bottom: 5px;
@@ -218,7 +219,7 @@ input, select, .rc-value, .qr-table td, .ms-diff { font-variant-numeric: tabular
   width: 100%;
   height: 34px;
   padding: 0 10px;
-  font-size: 13.5px;
+  font-size: 14px;
   color: var(--c-text);
   background: var(--c-surface);
   border: 1px solid var(--c-border);
@@ -233,7 +234,7 @@ select.form-input { padding-right: 6px; }
   box-shadow: 0 0 0 2px var(--c-primary-tint);
 }
 .form-description {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--c-text-faint);
   margin-top: 4px;
   line-height: 1.6;
@@ -250,7 +251,7 @@ select.form-input { padding-right: 6px; }
   justify-content: center;
   height: 34px;
   padding: 0 16px;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   border-radius: var(--r-ctrl);
   border: 1px solid transparent;
@@ -261,7 +262,7 @@ select.form-input { padding-right: 6px; }
 .btn-primary:hover { background: var(--c-primary-d); }
 .btn-secondary { background: var(--c-surface); color: var(--c-text); border-color: var(--c-border); }
 .btn-secondary:hover { color: var(--c-primary-d); background: var(--c-surface-2); border-color: var(--c-rule2); }
-.btn-sm { height: 28px; padding: 0 10px; font-size: 12px; }
+.btn-sm { height: 28px; padding: 0 10px; font-size: 12.5px; }
 
 /* ==========================================================================
  * 結果表示（状態は色だけでなく左罫でも読めるようにする）
@@ -282,10 +283,10 @@ select.form-input { padding-right: 6px; }
 }
 .result-cell[hidden] { display: none; }
 .rc-label {
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 600;
   color: var(--c-text-faint);
-  letter-spacing: .04em;
+  letter-spacing: 0;
 }
 .rc-value {
   font-size: 20px;
@@ -326,7 +327,7 @@ select.form-input { padding-right: 6px; }
   border-left: 2px solid var(--c-primary);
   border-radius: var(--r-card);
   font-family: var(--font-mono);
-  font-size: 12.5px;
+  font-size: 13px;
   line-height: 1.7;
   color: var(--c-text);
   overflow-x: auto;
@@ -334,7 +335,7 @@ select.form-input { padding-right: 6px; }
 }
 .basis-line {
   margin: var(--s2) 0 0;
-  font-size: 11.5px;
+  font-size: 12.5px;
   line-height: 1.75;
   color: var(--c-text-mid);
 }
@@ -346,7 +347,7 @@ select.form-input { padding-right: 6px; }
   padding: 8px 11px;
   margin-bottom: 5px;
   border-radius: var(--r-card);
-  font-size: 12.5px;
+  font-size: 13px;
   line-height: 1.65;
   background: var(--c-warn-bg);
   border: 1px solid var(--c-warn-bd);
@@ -363,7 +364,7 @@ select.form-input { padding-right: 6px; }
 .alert {
   padding: 10px 12px;
   border-radius: var(--r-card);
-  font-size: 12.5px;
+  font-size: 13px;
   line-height: 1.75;
   border: 1px solid var(--c-line);
   border-left: 2px solid var(--c-rule2);
@@ -392,15 +393,15 @@ select.form-input { padding-right: 6px; }
   align-items: center;
 }
 .row-head {
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 600;
   color: var(--c-text-faint);
-  letter-spacing: .04em;
+  letter-spacing: 0;
   margin-bottom: 5px;
 }
 .misstatement-row { margin-bottom: 6px; }
 .ms-diff {
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   padding: 0 10px;
   height: 34px;
@@ -460,7 +461,7 @@ select.form-input { padding-right: 6px; }
   font-family: var(--font-serif);
   font-size: 21px;
   font-weight: 600;
-  letter-spacing: .01em;
+  letter-spacing: 0;
   color: var(--c-text);
   line-height: 1.5;
 }
@@ -477,8 +478,8 @@ select.form-input { padding-right: 6px; }
 .theory-section > summary:hover { color: var(--c-primary-d); }
 .secno {
   font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: .12em;
+  font-size: 12px;
+  letter-spacing: 0;
   color: var(--c-primary);
   font-weight: 400;
   flex: none;
@@ -505,7 +506,7 @@ select.form-input { padding-right: 6px; }
 .theory-body li { margin-bottom: .4em; }
 .theory-body code {
   font-family: var(--font-mono);
-  font-size: 12.5px;
+  font-size: 13px;
   background: var(--c-tone);
   border: 1px solid var(--c-rule);
   border-radius: var(--r-ctrl);
@@ -516,7 +517,7 @@ select.form-input { padding-right: 6px; }
 
 .theory-formula {
   font-family: var(--font-mono);
-  font-size: 12.5px;
+  font-size: 13px;
   line-height: 1.9;
   background: var(--c-surface);
   border: 1px solid var(--c-rule);
@@ -535,15 +536,15 @@ select.form-input { padding-right: 6px; }
   border-left: 2px solid var(--c-primary);
   border-radius: var(--r-card);
   padding: 13px 16px;
-  font-size: 13.5px;
+  font-size: 14px;
   line-height: 1.85;
   color: #143F3A;
 }
 .theory-intuition .ti-label {
   display: block;
   font-family: var(--font-mono);
-  font-size: 10.5px;
-  letter-spacing: .1em;
+  font-size: 11.5px;
+  letter-spacing: 0;
   color: var(--c-primary);
   margin-bottom: 4px;
 }
@@ -565,8 +566,8 @@ select.form-input { padding-right: 6px; }
   gap: var(--s2);
   color: var(--c-text-faint);
   font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: .05em;
+  font-size: 11px;
+  letter-spacing: 0;
 }
 .ai-document-meta time {
   color: var(--c-primary-d);
@@ -599,7 +600,7 @@ select.form-input { padding-right: 6px; }
   margin-top: 9px;
 }
 .ai-document-links a {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
 }
 
@@ -619,8 +620,8 @@ select.form-input { padding-right: 6px; }
 }
 .mi-tag {
   font-family: var(--font-mono);
-  font-size: 10.5px;
-  letter-spacing: .06em;
+  font-size: 11.5px;
+  letter-spacing: 0;
   padding: 1px 6px;
   border-radius: var(--r-ctrl);
   margin-top: 3px;
@@ -641,9 +642,9 @@ select.form-input { padding-right: 6px; }
 .term-table thead th {
   background: var(--c-tone);
   color: var(--c-doc-faint);
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 700;
-  letter-spacing: .04em;
+  letter-spacing: 0;
   white-space: nowrap;
   border-bottom: 1px solid var(--c-rule);
 }
@@ -654,7 +655,7 @@ select.form-input { padding-right: 6px; }
   color: var(--c-primary-d);
   white-space: nowrap;
 }
-.t-en { color: var(--c-doc-mid); font-size: 12px; }
+.t-en { color: var(--c-doc-mid); font-size: 12.5px; }
 
 /* ==========================================================================
  * 早見表
@@ -674,9 +675,9 @@ select.form-input { padding-right: 6px; }
 .qr-table thead th {
   background: var(--c-tone);
   color: var(--c-doc-faint);
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 700;
-  letter-spacing: .04em;
+  letter-spacing: 0;
   white-space: nowrap;
 }
 .qr-table tbody th {
@@ -687,7 +688,7 @@ select.form-input { padding-right: 6px; }
 }
 .qr-table tbody tr:hover td { background: var(--c-surface-2); }
 .qr-table td strong { font-size: 14px; color: var(--c-primary-d); }
-.qr-sub { display: block; font-size: 10px; color: var(--c-text-faint); margin-top: 2px; }
+.qr-sub { display: block; font-size: 11px; color: var(--c-text-faint); margin-top: 2px; }
 .qr-controls { display: flex; gap: var(--s3); align-items: center; flex-wrap: wrap; margin: .8em 0; }
 .qr-controls .form-label { margin-bottom: 0; }
 
@@ -702,7 +703,7 @@ select.form-input { padding-right: 6px; }
   z-index: 90;
   max-width: min(420px, calc(100vw - 40px));
   padding: 11px 15px;
-  font-size: 12.5px;
+  font-size: 13px;
   line-height: 1.6;
   border-radius: var(--r-card);
   background: var(--c-primary-d);
@@ -715,7 +716,7 @@ select.form-input { padding-right: 6px; }
   margin-top: var(--s6);
   padding-top: var(--s4);
   border-top: 1px solid var(--c-rule);
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--c-doc-faint);
   line-height: 1.8;
 }
