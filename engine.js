@@ -263,7 +263,7 @@
         sampleSize: 0,
         statistical: samplingApproach === 'statistical',
         samplingApproach,
-        warnings: ['母集団件数と許容逸脱率を正しく入力してください。'],
+        warnings: ['母集団件数と、許容する逸脱の上限割合を正しく入力してください。'],
         basis: '入力が不足しているため算定できません。',
         formula: { expression: 'n = サンプリング設計による', substituted: '—', result: NaN }
       };
@@ -283,12 +283,12 @@
       derived = picked.derived;
 
       if (!Number.isFinite(sampleSize)) {
-        warnings.push('許容逸脱率が範囲外のためサンプル数を算定できません。');
+        warnings.push('許容する逸脱の上限割合が範囲外のため、サンプル数を算定できません。');
         sampleSize = 0;
       }
 
       basis = derived
-        ? `正確二項（Clopper–Pearson）による統計的サンプリングです。過信リスク ROO=${pct(roo, 0)}、許容逸脱率 ${pct(tolerableRate, 0)}、計画上の予想逸脱 ${expectedDeviations} 件のもとで、上限逸脱率が許容逸脱率以下になる最小件数を求めます。`
+        ? `正確二項（Clopper–Pearson）による統計的サンプリングです。過信リスク ROO=${pct(roo, 0)}、許容する逸脱の上限割合（TDR）${pct(tolerableRate, 0)}、計画上の予想逸脱 ${expectedDeviations} 件のもとで、母集団で想定する逸脱率の上限（ULD）が設定した上限割合以下になる最小件数を求めます。`
         : '標準サンプル数表（過信リスク10%／信頼度90%）による統計的サンプリングです。一部のセルは正確二項の最小値より保守的です。';
 
       const nextLevel = attributeSampleSizeFromTable(tolerableRate, expectedDeviations + 1, roo);
@@ -308,8 +308,8 @@
           ? `（正確二項の最小値 ${group(exactMinimum)}件を上回る保守側の慣行値）`
           : '（正確二項の最小値と一致）';
         formula = {
-          expression: 'n = 標準サンプル数表[許容逸脱率, 計画上の予想逸脱件数]（ROO=10%）',
-          substituted: `n = 標準表[許容逸脱率 ${pct(tolerableRate, 0)}, 予想逸脱 ${expectedDeviations}件] = ${group(sampleSize)}件${margin}`,
+          expression: 'n = 標準サンプル数表[許容する逸脱の上限割合, 計画上の予想逸脱件数]（ROO=10%）',
+          substituted: `n = 標準表[許容する逸脱の上限割合 ${pct(tolerableRate, 0)}, 予想逸脱 ${expectedDeviations}件] = ${group(sampleSize)}件${margin}`,
           result: sampleSize
         };
         if (Number.isFinite(exactMinimum) && exactMinimum < sampleSize) exactMinimumSampleSize = exactMinimum;
@@ -325,7 +325,7 @@
       const rule = frequencyRules[frequency];
       sampleSize = rule ? rule.size : Math.min(25, tenPercentRule);
       basis = `本ツールの参考頻度別ルール${rule ? `（${rule.label}）` : ''}による非統計的サンプリングです。監査基準が定める固定件数ではありません。所属法人等のメソドロジーを確認し、職業的専門家としてサンプル数を決定してください。`;
-      warnings.push('非統計的サンプリングを選択しています。表示件数は参考値です。所属法人等のルールと置き換え、上限逸脱率だけから統計的な結論を導かないでください。');
+      warnings.push('非統計的サンプリングを選択しています。表示件数は参考値です。所属法人等のルールと置き換え、母集団で想定する逸脱率の上限だけから統計的な結論を導かないでください。');
       formula = {
         expression: 'n = 参考頻度別ルール（所属法人等のメソドロジーを要確認）',
         substituted: `n = ${FREQUENCY_LABELS[frequency] || frequency}・母集団${group(populationSize)}件 → ${group(sampleSize)}件（非統計的）`,
@@ -347,7 +347,7 @@
     }
 
     if (sampleSize > 0 && expectedDeviations / sampleSize >= tolerableRate) {
-      warnings.push('計画上の予想逸脱率が許容逸脱率以上です。統制に依拠する監査アプローチを再検討してください。');
+      warnings.push('事前に見込む逸脱の割合が、許容する上限割合以上です。統制に依拠する監査アプローチを再検討してください。');
     }
 
     return {
@@ -416,10 +416,10 @@
       } else {
         evaluation = '計画した統制依拠を支持しない';
         requiredAction = '逸脱の性質・原因・影響を調査し、統制への依拠の見直し、追加手続又は実証手続の拡大を検討してください。';
-        warnings.push('上限逸脱率が許容逸脱率を超えています。追加サンプルだけで機械的に結論を反転させず、原因と監査アプローチを再評価してください。');
+        warnings.push('母集団で想定する逸脱率の上限が、許容する上限割合を超えています。追加サンプルだけで機械的に結論を反転させず、原因と監査アプローチを再評価してください。');
       }
     } else {
-      warnings.push('非統計的サンプリングのため、上限逸脱率は参考値です。この数値だけから統計的な結論は導けません。');
+      warnings.push('非統計的サンプリングのため、母集団で想定する逸脱率の上限は参考値です。この数値だけから統計的な結論は導けません。');
     }
 
     const comparison = statistical ? (effective ? '≤' : '>') : '（参考）';
@@ -439,7 +439,7 @@
       additionalSamplesToPass: null,
       warnings,
       basis: statistical
-        ? `正確二項（Clopper–Pearson）による片側上限です。過信リスク ROO=${pct(roo, 0)}。上限逸脱率 ${pct(uld)} と許容逸脱率 ${pct(tolerableRate, 0)} を比較した統計的結果であり、統制不備の最終判断そのものではありません。`
+        ? `正確二項（Clopper–Pearson）による片側上限です。過信リスク ROO=${pct(roo, 0)}。母集団で想定する逸脱率の上限（ULD）${pct(uld)} と、許容する逸脱の上限割合（TDR）${pct(tolerableRate, 0)} を比較した統計的結果であり、統制不備の最終判断そのものではありません。`
         : `正確二項による参考値です。設計が非統計的なため、ROO=${pct(roo, 0)} に基づく統計的結論としては使用できません。`,
       formula: {
         expression: 'ULD = BetaInv(1 − ROO, x + 1, n − x)',
@@ -843,10 +843,10 @@
         type,
         ROO: roo,
         confidenceLevel: 1 - roo,
-        columns: ['許容逸脱率', '予想逸脱0件', '予想逸脱1件', '予想逸脱2件'],
+        columns: ['許容する逸脱の上限割合', '予想逸脱0件', '予想逸脱1件', '予想逸脱2件'],
         rows,
         warnings: [],
-        basis: `統制テストの早見表です。過信リスク ROO=${pct(roo, 0)}（信頼度${pct(1 - roo, 0)}）。各セルは計算画面と同じ関数で求めています。下段は正確二項による上限逸脱率です。`,
+        basis: `統制テストの早見表です。過信リスク ROO=${pct(roo, 0)}（信頼度${pct(1 - roo, 0)}）。各セルは計算画面と同じ関数で求めています。下段は正確二項による、母集団で想定する逸脱率の上限です。`,
         formula: {
           expression: 'n = min{ n : P(X ≤ x | n, TDR) ≤ ROO }',
           substituted: `ROO = ${pct(roo, 0)} における標準サンプル数表`,

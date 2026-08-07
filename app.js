@@ -462,7 +462,7 @@
       html += '<tr><th>' + escapeHtml(row.label) + '</th>';
       row.cells.forEach(function(cell) {
         html += '<td><strong>' + intText(cell.sampleSize) + '件</strong>'
-          + '<span class="qr-sub">上限逸脱率 ' + pctText(cell.upperDeviationLimit) + '</span></td>';
+          + '<span class="qr-sub">母集団で想定する逸脱率の上限 ' + pctText(cell.upperDeviationLimit) + '</span></td>';
       });
       html += '</tr>';
     });
@@ -536,7 +536,7 @@
       const a = state.attribute;
       push('統制頻度', a.frequencyLabel);
       push('母集団件数', intText(a.populationSize) + '件');
-      push('許容逸脱率', pctText(a.tolerableRate, 0));
+      push('許容する逸脱の上限割合（TDR）', pctText(a.tolerableRate, 0));
       push('計画上の予想逸脱件数', intText(a.expectedDeviations) + '件');
       push('必要サンプル数', intText(a.sampleSize) + '件');
       push('予想逸脱+1件時の増分', a.additionalSamples === null ? 'N/A' : intText(a.additionalSamples) + '件');
@@ -567,9 +567,9 @@
       const ev = state.attributeEval;
       push('サンプル数', intText(ev.sampleSize) + '件');
       push('逸脱件数', intText(ev.deviations) + '件');
-      push('標本逸脱率', pctText(ev.deviationRate));
-      push('上限逸脱率 ULD', pctText(ev.upperDeviationLimit));
-      push('許容逸脱率', pctText(ev.tolerableRate, 0));
+      push('サンプル内の逸脱割合', pctText(ev.deviationRate));
+      push('母集団で想定する逸脱率の上限（ULD）', pctText(ev.upperDeviationLimit));
+      push('許容する逸脱の上限割合（TDR）', pctText(ev.tolerableRate, 0));
       push('統計的結果／判断', ev.evaluation);
       push('必要な対応', ev.requiredAction);
       push('算式', ev.formula.substituted);

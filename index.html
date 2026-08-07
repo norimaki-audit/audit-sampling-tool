@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>監査サンプリング設計 v3.0</title>
-<meta name="description" content="統制テストと金額単位サンプリング（MUS）のサンプル数算定、誤謬評価、計算結果・前提・注意事項の整理をブラウザで補助する無料ツールです。">
+<meta name="description" content="統制テストと金額単位サンプリング（MUS）のサンプル数算定、誤謬評価、計算結果・前提・注意事項の整理をブラウザで補助する個人開発ツールです。">
 <link rel="canonical" href="https://norimaki-audit.github.io/audit-sampling-tool/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="監査サンプリング設計">
@@ -297,12 +297,13 @@
               <div class="form-description">当該統制が実施される機会の総数</div>
             </div>
             <div class="form-group">
-              <label class="form-label" for="tolerableRate">許容逸脱率 TDR</label>
+              <label class="form-label" for="tolerableRate">許容する逸脱の上限割合</label>
               <select id="tolerableRate" class="form-input">
                 <option value="0.09">9%（統制への依拠：標準）</option>
                 <option value="0.07">7%（統制への依拠：やや強い）</option>
                 <option value="0.05">5%（統制への依拠：強い）</option>
               </select>
+              <div class="form-description">母集団全体で、この割合を超えて手続どおりでない事例があるなら、統制への依拠を見直すという基準です。</div>
             </div>
             <div class="form-group">
               <label class="form-label" for="expectedDeviations">計画上の予想逸脱件数</label>
@@ -387,7 +388,7 @@
       <div class="step-head">
         <span class="step-num">5</span>
         <h2>誤謬評価</h2>
-        <span class="step-sub">統計的な数値結果に、定性的な評価を重ねます</span>
+        <span class="step-sub">逸脱（統制の実施漏れ等）または誤謬（金額・表示の誤り）を評価します</span>
       </div>
       <div class="step-body">
 
@@ -401,16 +402,22 @@
             <div class="form-group">
               <label class="form-label" for="attrDeviations">発見された逸脱件数</label>
               <input id="attrDeviations" type="number" class="form-input" min="0" step="1" value="0">
+              <div class="form-description">承認漏れなど、決められた統制手続どおりでなかった件数</div>
             </div>
+          </div>
+
+          <div class="alert info" style="margin-bottom:16px">
+            <strong>サンプル内の逸脱割合</strong>は、確認した件数に占める逸脱件数の割合です。
+            <strong>母集団で想定する逸脱率の上限</strong>は、見ていない項目も含めると逸脱がどこまであり得るかを統計的に見積もった上限です。
           </div>
 
           <div class="result-grid">
             <div class="result-cell">
-              <div class="rc-label">標本逸脱率</div>
+              <div class="rc-label">サンプル内の逸脱割合</div>
               <div class="rc-value" id="attrDeviationRate">—</div>
             </div>
             <div class="result-cell" id="attrUldCell">
-              <div class="rc-label">上限逸脱率 ULD</div>
+              <div class="rc-label">母集団で想定する逸脱率の上限</div>
               <div class="rc-value" id="attrUpperLimit">—</div>
             </div>
             <div class="result-cell" id="attrEvalCell">
@@ -521,6 +528,17 @@
       <strong>まずこちらで土台を作ってから</strong>そちらへ進んでいただくと理解しやすくなります。
     </p>
 
+    <div class="theory-intuition">
+      <span class="ti-label">最初に、この5語だけ</span>
+      <ul>
+        <li><strong>母集団</strong>：今回の確認対象となる取引や証憑の全体。</li>
+        <li><strong>サンプル</strong>：母集団から選び、実際に確認する一部の項目。</li>
+        <li><strong>逸脱（いつだつ）</strong>：承認漏れなど、決められた統制手続どおりでなかった事例。</li>
+        <li><strong>逸脱率</strong>：全体に占める逸脱の割合。母集団全体での実際の割合を「真の逸脱率」と呼びます。</li>
+        <li><strong>誤謬（ごびゅう）</strong>：帳簿金額や財務諸表の表示にある誤り。</li>
+      </ul>
+    </div>
+
     <details class="theory-section" open>
       <summary><span class="secno">01</span>なぜ一部を見ただけで全体のことが言えるのか</summary>
       <div class="theory-body">
@@ -530,8 +548,8 @@
         </p>
         <p>
           答えを先に言うと、<strong>「言える」のは限られた形だけ</strong>です。
-          25件を見てわかるのは「母集団の逸脱率はちょうど◯%です」ではありません。
-          わかるのは<strong>「逸脱率が◯%より高いとは考えにくい」</strong>ということだけです。
+          25件を見てわかるのは「全体で手続どおりでない項目の割合は、ちょうど◯%です」ではありません。
+          わかるのは<strong>「その割合が◯%より高いとは考えにくい」</strong>ということだけです。
           サンプリングは、当てにいく手続ではなく、<strong>可能性を絞り込む手続</strong>です。
         </p>
 
@@ -553,6 +571,7 @@
           監査基準もこの点を明確にしています。監査基準報告書500 A55項は、
           特定の項目だけを狙って抜き出す方法について
           「母集団の中から抽出されない母集団の残余部分に関する監査証拠を提供しない」と述べています。
+          ここでいう監査証拠は、監査人が判断を支えるために使う資料・記録・回答などの情報です。
           金額の大きいものだけを見るのは有効な手続ですが、
           <strong>それだけでは残りについて語れない</strong>ということです。
         </p>
@@ -562,8 +581,10 @@
           無作為に25件抜くと、その25件は母集団の縮図に<strong>なりやすくなります</strong>。
           ただし「必ず縮図になる」わけではありません。たまたま良いところばかり引くこともあります。
           統計が扱うのは、まさにこの<strong>「たまたま外す可能性」</strong>です。
-          これをサンプリングリスクと呼び、あらかじめ「何%までなら外してもよいか」を決めておきます。
-          本ツールの ROO（過信リスク）や RIA（受入リスク）は、この「何%まで」にあたります。
+          これを<strong>サンプリングリスク（選んだ一部が全体をうまく表さず、判断を誤る可能性）</strong>と呼び、
+          あらかじめ「何%までなら外してもよいか」を決めておきます。
+          統制が実際には有効でないのに有効だと判断する可能性を<strong>過信リスク（ROO）</strong>、
+          重要な誤りがあるのに問題ないと判断する可能性を<strong>受入リスク（RIA）</strong>と呼びます。
         </p>
         <div class="misread">
           <div class="misread-item">
@@ -586,7 +607,7 @@
           <strong>起こりうる結果を全部並べて、それぞれの起こりやすさを書き添えた一覧表</strong>のことです。
         </p>
         <p>
-          統制テストで25件を検証するとします。結果として起こりうるのは
+          統制テスト（承認などの社内ルールが実際に守られているかを確かめるテスト）で25件を検証するとします。結果として起こりうるのは
           「逸脱0件」「1件」「2件」…「25件」の26通りです。
           この26通りそれぞれに「どのくらい起こりやすいか」を割り当てたものが分布です。
         </p>
@@ -704,7 +725,7 @@ n = 25:  0.91 を25回掛ける =  9.5%   → 10%以下になった ✓</div>
       <summary><span class="secno">04</span>ポアソン分布をゼロから</summary>
       <div class="theory-body">
         <p>
-          実証手続（BS・PL項目の金額のテスト）では、二項分布ではなくポアソン分布を使います。
+          実証手続（帳簿の金額や表示が正しいかを確かめるテスト）では、二項分布ではなくポアソン分布を使います。
           分けている理由は、<strong>母集団の数え方が変わるから</strong>です。
         </p>
         <p>
@@ -751,7 +772,7 @@ n = 25:  0.91 を25回掛ける =  9.5%   → 10%以下になった ✓</div>
         <p>
           これが金額単位サンプリングの出発点です。
           <strong>「これだけの誤謬が潜んでいたとして、1件も引っかからない確率」</strong>を表しています。
-          この確率を、あらかじめ決めた受入リスク RIA に一致させるように λ を決める——
+          この確率を、あらかじめ決めた受入リスク RIA（重要な誤りがあるのに問題ないと判断する可能性）に一致させるように λ を決める——
           それが理論編で出てくる <code>CF(0) = −ln(RIA)</code> です。
         </p>
         <div class="misread">
