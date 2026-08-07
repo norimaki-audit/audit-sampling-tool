@@ -4,12 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>監査サンプリング設計 v3.0</title>
-<meta name="description" content="統制テストと金額単位サンプリング（MUS）のサンプル数算定、誤謬評価、調書ドラフト作成をブラウザで補助する無料ツールです。">
+<meta name="description" content="統制テストと金額単位サンプリング（MUS）のサンプル数算定、誤謬評価、計算結果・前提・注意事項の整理をブラウザで補助する無料ツールです。">
 <link rel="canonical" href="https://norimaki-audit.github.io/audit-sampling-tool/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="監査サンプリング設計">
 <meta property="og:title" content="監査サンプリング設計 v3.0">
-<meta property="og:description" content="統制テストとMUSのサンプル数算定から誤謬評価、調書ドラフト作成までをブラウザで補助します。">
+<meta property="og:description" content="統制テストとMUSのサンプル数算定、誤謬評価、計算結果・前提・注意事項の整理をブラウザで補助します。">
 <meta property="og:url" content="https://norimaki-audit.github.io/audit-sampling-tool/">
 <meta property="og:image" content="https://norimaki-audit.github.io/audit-sampling-tool/og-audit-sampling.png">
 <meta property="og:image:secure_url" content="https://norimaki-audit.github.io/audit-sampling-tool/og-audit-sampling.png">
@@ -19,7 +19,7 @@
 <meta property="og:image:alt" content="監査サンプリング設計ツールの計算画面">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="監査サンプリング設計 v3.0">
-<meta name="twitter:description" content="統制テストとMUSのサンプル数算定から誤謬評価、調書ドラフト作成までをブラウザで補助します。">
+<meta name="twitter:description" content="統制テストとMUSのサンプル数算定、誤謬評価、計算結果・前提・注意事項の整理をブラウザで補助します。">
 <meta name="twitter:image" content="https://norimaki-audit.github.io/audit-sampling-tool/og-audit-sampling.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='2' fill='%230F6B62'/%3E%3Cpath d='M6 7h12M6 12h12M6 17h7' stroke='white' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="./styles.css">
@@ -32,7 +32,7 @@
   <div class="appbar-inner">
     <div>
       <h1>監査サンプリング設計</h1>
-      <div class="version">v3.0 — リスク評価からサンプル数算定、誤謬評価、調書出力までを一本の導線で</div>
+      <div class="version">v3.0 — リスク評価からサンプル数算定、誤謬評価、検討用テキスト出力までを一本の導線で</div>
     </div>
     <div class="scope-tags" aria-label="対応範囲">
       <span class="scope-tag">CONTROL TEST</span>
@@ -59,7 +59,7 @@
 
   <!-- ==================================================================== -->
   <!-- 計算パネル：①対象 → ②リスク評価 → ③特定項目控除 → ④サンプル数算定  -->
-  <!--            → ⑤誤謬評価 → ⑥調書出力                                  -->
+  <!--            → ⑤誤謬評価 → ⑥検討用テキスト出力                                  -->
   <!-- ==================================================================== -->
   <section class="mode-panel" id="panel-design" role="tabpanel" aria-labelledby="tab-design">
 
@@ -488,16 +488,16 @@
       </div>
     </section>
 
-    <!-- ⑥調書出力 -->
+    <!-- ⑥検討用テキスト出力 -->
     <section class="step" id="step-export">
       <div class="step-head">
         <span class="step-num">6</span>
-        <h2>調書出力</h2>
+        <h2>検討用テキスト出力</h2>
         <span class="step-sub" id="buildStamp"></span>
       </div>
       <div class="step-body">
         <div class="alert info" style="margin-bottom:16px">
-          出力は計画・検討用のドラフトです。算式・算定根拠・警告・免責を含みますが、これだけでは十分な監査証拠又は正式な監査調書になりません。
+          計算結果を整理するための参考テキストです。算式・算定根拠・警告・免責を含みますが、これだけでは十分な監査証拠又は正式な監査調書になりません。
         </div>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
           <button type="button" class="btn btn-primary" id="copyWorksheet">クリップボードにコピー</button>

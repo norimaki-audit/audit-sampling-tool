@@ -489,14 +489,14 @@
     host.innerHTML = html;
   }
 
-  /* ------------------------------------------------------ ⑥調書出力 */
+  /* ------------------------------------------------------ ⑥検討用テキスト出力 */
 
   function buildWorksheet() {
     const type = currentTestType();
     const lines = [];
     const push = (label, value) => lines.push(label + '\t' + value);
 
-    lines.push('監査サンプリング調書 v3.0');
+    lines.push('監査サンプリング検討メモ v3.0');
     lines.push('【重要な免責】個人開発の非公式ツールによる計画・検討用の出力です。監査基準、所属法人等のメソドロジー、職業的専門家としての判断、十分かつ適切な監査証拠又は正式な監査調書を代替しません。計算と入力値は利用者が再検証してください。');
     lines.push('');
     push('対象会社', readStr('company') || '—');
@@ -601,7 +601,7 @@
 
   function copyWorksheet() {
     const text = buildWorksheet();
-    const done = () => toast('調書をクリップボードにコピーしました');
+    const done = () => toast('検討用テキストをクリップボードにコピーしました');
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(done).catch(function() { fallbackCopy(text, done); });
     } else {
@@ -629,12 +629,12 @@
     const link = document.createElement('a');
     const account = (readStr('account') || 'sampling').replace(/[\\/:*?"<>|]/g, '_');
     link.href = url;
-    link.download = `監査サンプリング調書_${account}.txt`;
+    link.download = `監査サンプリング検討メモ_${account}.txt`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
-    toast('調書をダウンロードしました');
+    toast('検討用テキストをダウンロードしました');
   }
 
   function previewWorksheet() {
@@ -726,7 +726,7 @@
       previewIfOpen();
     });
 
-    // 調書出力
+    // 検討用テキスト出力
     $('copyWorksheet').addEventListener('click', copyWorksheet);
     $('downloadWorksheet').addEventListener('click', downloadWorksheet);
     $('previewWorksheetBtn').addEventListener('click', previewWorksheet);
